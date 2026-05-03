@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Entrega Gráfica — Painel de Pedidos</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0f0f0f;
+    --surface: #1a1a1a;
+    --surface2: #222222;
+    --border: #2a2a2a;
+    --border2: #333333;
+    --text: #f0f0f0;
+    --text2: #999;
+    --text3: #555;
+    --accent: #c8f060;
+    --accent2: #a8d040;
+    --danger: #ff5555;
+    --warning: #ffaa00;
+    --success: #44dd88;
+    --info: #55aaff;
+    --purple: #aa88ff;
+    --font: 'DM Sans', sans-serif;
+    --mono: 'DM Mono', monospace;
+    --radius: 10px;
+    --radius-lg: 16px;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* HEADER */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 32px;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 100;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .logo-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+
+  .logo-text {
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: -0.3px;
+  }
+
+  .logo-sub {
+    font-size: 12px;
+    color: var(--text3);
+    font-family: var(--mono);
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .btn-refresh {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    color: var(--text2);
+    padding: 7px 14px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-family: var(--font);
+    font-size: 13px;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .btn-refresh:hover { border-color: var(--accent); color: var(--accent); }
+
+  .last-update {
+    font-size: 12px;
+    color: var(--text3);
+    font-family: var(--mono);
+  }
+
+  /* MAIN */
+  .main { padding: 28px 32px; }
+
+  /* MÉTRICAS */
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+
+  .metric {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 18px 20px;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .metric::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--m-color, var(--border2));
+    transition: opacity 0.15s;
+    opacity: 0.6;
+  }
+
+  .metric:hover { border-color: var(--border2); transform: translateY(-1px); }
+  .metric.active { border-color: var(--m-color, var(--accent)); }
+  .metric.active::before { opacity: 1; }
+
+  .metric-val {
+    font-size: 28px;
+    font-weight: 600;
+    letter-spacing: -1px;
+    line-height: 1;
+    margin-bottom: 6px;
+    color: var(--m-color, var(--text));
+  }
+
+  .metric-label {
+    font-size: 11px;
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 500;
+  }
+
+  /* FILTROS */
+  .filters {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .filters input[type="date"],
+  .filters select {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    color: var(--text2);
+    padding: 8px 12px;
+    border-radius: var(--radius);
+    font-family: var(--font);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .filters input[type="date"]:focus,
+  .filters select:focus { border-color: var(--accent); color: var(--text); }
+
+  .filters label {
+    font-size: 12px;
+    color: var(--text3);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .btn-clear {
+    background: transparent;
+    border: 1px solid var(--border2);
+    color: var(--text3);
+    padding: 8px 12px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-family: var(--font);
+    font-size: 12px;
+    transition: all 0.15s;
+  }
+
+  .btn-clear:hover { border-color: var(--danger); color: var(--danger); }
+
+  /* TABELA */
+  .table-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+
+  .table-header-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .table-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text2);
+  }
+
+  .table-count {
+    font-size: 12px;
+    color: var(--text3);
+    font-family: var(--mono);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  th {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 10px 16px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+  }
+
+  td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+    font-size: 13px;
+  }
+
+  tr:last-child td { border-bottom: none; }
+
+  tr:hover td { background: rgba(255,255,255,0.02); }
+
+  .client-info { display: flex; flex-direction: column; gap: 2px; }
+  .client-name { font-weight: 500; color: var(--text); font-size: 13px; }
+  .client-ig { font-size: 11px; color: var(--text3); font-family: var(--mono); }
+
+  .phone-link {
+    color: var(--success);
+    text-decoration: none;
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+
+  .phone-link:hover { text-decoration: underline; }
+
+  /* BADGES DE STATUS */
+  .steps {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+  }
+
+  .step {
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s;
+    border: 1px solid transparent;
+    position: relative;
+  }
+
+  .step[data-done="true"] { background: rgba(68,221,136,0.15); border-color: rgba(68,221,136,0.3); color: var(--success); }
+  .step[data-done="false"] { background: var(--surface2); border-color: var(--border2); color: var(--text3); }
+  .step:hover { border-color: var(--accent) !important; color: var(--accent) !important; }
+
+  .step-tooltip {
+    position: absolute;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #111;
+    border: 1px solid var(--border2);
+    color: var(--text2);
+    font-size: 10px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.1s;
+    z-index: 10;
+  }
+
+  .step:hover .step-tooltip { opacity: 1; }
+
+  /* STATUS GERAL BADGE */
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 9px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+  }
+
+  /* VALOR */
+  .valor { font-family: var(--mono); font-size: 12px; color: var(--text2); }
+  .valor strong { color: var(--accent); font-weight: 500; }
+
+  /* LOADING / EMPTY */
+  .loading, .empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text3);
+    font-size: 13px;
+  }
+
+  .loading::before { content: '⟳ '; animation: spin 1s linear infinite; display: inline-block; }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* MODAL */
+  .modal-bg {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .modal-bg.open { display: flex; }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius-lg);
+    width: 100%;
+    max-width: 500px;
+    padding: 24px;
+  }
+
+  .modal-title {
+    font-size: 15px;
+    font-weight: 500;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .modal-close {
+    background: none;
+    border: none;
+    color: var(--text3);
+    cursor: pointer;
+    font-size: 18px;
+    padding: 0 4px;
+    line-height: 1;
+  }
+
+  .modal-close:hover { color: var(--danger); }
+
+  .modal-field {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .modal-field:last-of-type { border-bottom: none; }
+
+  .modal-field-label {
+    font-size: 12px;
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+
+  .modal-field-val {
+    font-size: 13px;
+    color: var(--text);
+    font-family: var(--mono);
+    text-align: right;
+    max-width: 280px;
+    word-break: break-all;
+  }
+
+  .modal-actions {
+    margin-top: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .toggle-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border2);
+    background: var(--surface2);
+    cursor: pointer;
+    font-family: var(--font);
+    font-size: 13px;
+    color: var(--text2);
+    transition: all 0.15s;
+  }
+
+  .toggle-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .toggle-btn[data-active="true"] { border-color: rgba(68,221,136,0.4); color: var(--success); background: rgba(68,221,136,0.07); }
+
+  .toggle-indicator {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-weight: 500;
+  }
+
+  .toggle-btn[data-active="true"] .toggle-indicator { background: rgba(68,221,136,0.2); color: var(--success); }
+  .toggle-btn[data-active="false"] .toggle-indicator { background: var(--surface); color: var(--text3); }
+
+  .rastreio-wrap { display: flex; gap: 8px; margin-top: 12px; }
+  .rastreio-input {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    padding: 9px 12px;
+    border-radius: var(--radius);
+    font-family: var(--mono);
+    font-size: 12px;
+    outline: none;
+  }
+
+  .rastreio-input:focus { border-color: var(--accent); }
+
+  .btn-save {
+    background: var(--accent);
+    color: #111;
+    border: none;
+    padding: 9px 16px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-family: var(--font);
+    font-weight: 600;
+    font-size: 13px;
+    transition: background 0.15s;
+  }
+
+  .btn-save:hover { background: var(--accent2); }
+
+  /* TOAST */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    padding: 12px 18px;
+    border-radius: var(--radius);
+    font-size: 13px;
+    z-index: 999;
+    transform: translateY(80px);
+    opacity: 0;
+    transition: all 0.25s;
+  }
+
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.success { border-color: rgba(68,221,136,0.4); color: var(--success); }
+  .toast.error { border-color: rgba(255,85,85,0.4); color: var(--danger); }
+
+  /* CONFIG MODAL */
+  .config-field { margin-bottom: 14px; }
+  .config-label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 5px; }
+  .config-input {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    padding: 9px 12px;
+    border-radius: var(--radius);
+    font-family: var(--mono);
+    font-size: 12px;
+    outline: none;
+  }
+
+  .config-input:focus { border-color: var(--accent); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">
+    <div class="logo-dot"></div>
+    <div>
+      <div class="logo-text">Entrega Gráfica</div>
+      <div class="logo-sub">painel de pedidos</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <span class="last-update" id="lastUpdate">—</span>
+    <button class="btn-refresh" onclick="loadAll()">↻ Atualizar</button>
+    <button class="btn-refresh" onclick="openConfig()">⚙ Config</button>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- MÉTRICAS -->
+  <div class="metrics" id="metrics">
+    <div class="metric" style="--m-color:#f0f0f0" onclick="filterByStatus('todos')">
+      <div class="metric-val" id="m-total">—</div>
+      <div class="metric-label">Total</div>
+    </div>
+    <div class="metric" style="--m-color:var(--accent)" onclick="filterByEtapa('aguardando_arte')">
+      <div class="metric-val" id="m-arte">—</div>
+      <div class="metric-label">Aguard. Arte</div>
+    </div>
+    <div class="metric" style="--m-color:var(--warning)" onclick="filterByEtapa('aguardando_aprovacao')">
+      <div class="metric-val" id="m-aprov">—</div>
+      <div class="metric-label">Aguard. Aprova.</div>
+    </div>
+    <div class="metric" style="--m-color:var(--info)" onclick="filterByEtapa('aguardando_pagamento')">
+      <div class="metric-val" id="m-pag">—</div>
+      <div class="metric-label">Aguard. Pgto.</div>
+    </div>
+    <div class="metric" style="--m-color:var(--purple)" onclick="filterByEtapa('prontos_postar')">
+      <div class="metric-val" id="m-postar">—</div>
+      <div class="metric-label">Prontos Postar</div>
+    </div>
+    <div class="metric" style="--m-color:var(--success)" onclick="filterByEtapa('postados')">
+      <div class="metric-val" id="m-postados">—</div>
+      <div class="metric-label">Postados</div>
+    </div>
+    <div class="metric" style="--m-color:var(--accent)">
+      <div class="metric-val" id="m-receita" style="font-size:18px">—</div>
+      <div class="metric-label">Receita Total</div>
+    </div>
+  </div>
+
+  <!-- FILTROS -->
+  <div class="filters">
+    <label>De <input type="date" id="f-inicio" onchange="applyFilters()"></label>
+    <label>Até <input type="date" id="f-fim" onchange="applyFilters()"></label>
+    <select id="f-status" onchange="applyFilters()">
+      <option value="todos">Todos os status</option>
+      <option value="novo">Novo</option>
+      <option value="em_producao">Em produção</option>
+      <option value="aguardando_aprovacao">Aguardando aprovação</option>
+      <option value="postado">Postado</option>
+    </select>
+    <button class="btn-clear" onclick="clearFilters()">✕ Limpar</button>
+  </div>
+
+  <!-- TABELA -->
+  <div class="table-wrap">
+    <div class="table-header-bar">
+      <div class="table-title">Pedidos</div>
+      <div class="table-count" id="tableCount">—</div>
+    </div>
+    <div id="tableBody">
+      <div class="loading">Carregando pedidos...</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- MODAL DETALHES -->
+<div class="modal-bg" id="modalBg" onclick="closeModal(event)">
+  <div class="modal" id="modalContent">
+    <div class="modal-title">
+      <span id="modalClientName">—</span>
+      <button class="modal-close" onclick="closeModalDirect()">✕</button>
+    </div>
+    <div id="modalFields"></div>
+    <div class="modal-actions" id="modalActions"></div>
+  </div>
+</div>
+
+<!-- MODAL CONFIG -->
+<div class="modal-bg" id="configBg" onclick="closeConfig(event)">
+  <div class="modal">
+    <div class="modal-title">
+      <span>Configuração da API</span>
+      <button class="modal-close" onclick="closeConfigDirect()">✕</button>
+    </div>
+    <div class="config-field">
+      <div class="config-label">URL da API</div>
+      <input class="config-input" id="apiUrlInput" placeholder="https://api.seudominio.com.br" />
+    </div>
+    <div style="margin-top:16px;display:flex;gap:8px;">
+      <button class="btn-save" onclick="saveConfig()">Salvar e testar</button>
+    </div>
+    <div id="configStatus" style="margin-top:12px;font-size:12px;color:var(--text3);"></div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+let API = localStorage.getItem('eg_api_url') || '';
+let allPedidos = [];
+let currentFilters = { status: 'todos', inicio: '', fim: '', etapa: '' };
+let currentPedido = null;
+
+// CONFIG
+function openConfig() {
+  document.getElementById('apiUrlInput').value = API;
+  document.getElementById('configStatus').textContent = '';
+  document.getElementById('configBg').classList.add('open');
+}
+function closeConfig(e) { if (e.target === document.getElementById('configBg')) closeConfigDirect(); }
+function closeConfigDirect() { document.getElementById('configBg').classList.remove('open'); }
+async function saveConfig() {
+  const url = document.getElementById('apiUrlInput').value.trim().replace(/\/$/, '');
+  document.getElementById('configStatus').textContent = 'Testando conexão...';
+  try {
+    const r = await fetch(url + '/metricas');
+    if (!r.ok) throw new Error('Status ' + r.status);
+    API = url;
+    localStorage.setItem('eg_api_url', API);
+    document.getElementById('configStatus').textContent = '✓ Conectado com sucesso!';
+    document.getElementById('configStatus').style.color = 'var(--success)';
+    setTimeout(() => { closeConfigDirect(); loadAll(); }, 1000);
+  } catch(e) {
+    document.getElementById('configStatus').textContent = '✗ Erro: ' + e.message;
+    document.getElementById('configStatus').style.color = 'var(--danger)';
+  }
+}
+
+// TOAST
+function showToast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + type;
+  setTimeout(() => t.className = 'toast', 2500);
+}
+
+// CARREGAR DADOS
+async function loadAll() {
+  if (!API) { openConfig(); return; }
+  await Promise.all([loadMetricas(), loadPedidos()]);
+  document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('pt-BR');
+}
+
+async function loadMetricas() {
+  try {
+    const r = await fetch(API + '/metricas');
+    const d = await r.json();
+    document.getElementById('m-total').textContent = d.total;
+    document.getElementById('m-arte').textContent = d.aguardando_arte;
+    document.getElementById('m-aprov').textContent = d.aguardando_aprovacao;
+    document.getElementById('m-pag').textContent = d.aguardando_pagamento;
+    document.getElementById('m-postar').textContent = d.prontos_postar;
+    document.getElementById('m-postados').textContent = d.postados;
+    document.getElementById('m-receita').textContent = 'R$ ' + Number(d.receita_total).toLocaleString('pt-BR', {minimumFractionDigits:2});
+  } catch(e) { console.error(e); }
+}
+
+async function loadPedidos() {
+  try {
+    const params = new URLSearchParams();
+    if (currentFilters.status !== 'todos') params.set('status', currentFilters.status);
+    if (currentFilters.inicio) params.set('data_inicio', currentFilters.inicio);
+    if (currentFilters.fim) params.set('data_fim', currentFilters.fim);
+    const r = await fetch(API + '/pedidos?' + params);
+    allPedidos = await r.json();
+    renderTable();
+  } catch(e) {
+    document.getElementById('tableBody').innerHTML = '<div class="empty">Erro ao carregar pedidos. Verifique a URL da API.</div>';
+  }
+}
+
+// FILTROS
+function applyFilters() {
+  currentFilters.status = document.getElementById('f-status').value;
+  currentFilters.inicio = document.getElementById('f-inicio').value;
+  currentFilters.fim = document.getElementById('f-fim').value;
+  currentFilters.etapa = '';
+  loadPedidos();
+}
+
+function clearFilters() {
+  document.getElementById('f-status').value = 'todos';
+  document.getElementById('f-inicio').value = '';
+  document.getElementById('f-fim').value = '';
+  currentFilters = { status: 'todos', inicio: '', fim: '', etapa: '' };
+  loadPedidos();
+}
+
+function filterByStatus(s) { document.getElementById('f-status').value = s; applyFilters(); }
+
+function filterByEtapa(etapa) {
+  currentFilters.etapa = etapa;
+  renderTable();
+}
+
+// RENDER TABELA
+function renderTable() {
+  let pedidos = [...allPedidos];
+
+  if (currentFilters.etapa) {
+    pedidos = pedidos.filter(p => {
+      if (currentFilters.etapa === 'aguardando_arte') return !p.arte_enviada;
+      if (currentFilters.etapa === 'aguardando_aprovacao') return p.arte_enviada && !p.arte_aprovada;
+      if (currentFilters.etapa === 'aguardando_pagamento') return p.arte_aprovada && !p.pagamento_final;
+      if (currentFilters.etapa === 'prontos_postar') return p.pagamento_final && !p.postado;
+      if (currentFilters.etapa === 'postados') return p.postado;
+      return true;
+    });
+  }
+
+  document.getElementById('tableCount').textContent = pedidos.length + ' pedido(s)';
+
+  if (pedidos.length === 0) {
+    document.getElementById('tableBody').innerHTML = '<div class="empty">Nenhum pedido encontrado</div>';
+    return;
+  }
+
+  const rows = pedidos.map(p => {
+    const steps = [
+      { campo: 'sinal_pago', label: 'Sinal', icon: '$', val: p.sinal_pago },
+      { campo: 'arte_enviada', label: 'Arte', icon: '✎', val: p.arte_enviada },
+      { campo: 'arte_aprovada', label: 'Aprovada', icon: '✓', val: p.arte_aprovada },
+      { campo: 'pagamento_final', label: 'Pgto Final', icon: '₿', val: p.pagamento_final },
+      { campo: 'postado', label: 'Postado', icon: '▲', val: p.postado },
+    ];
+
+    const stepsHtml = steps.map(s => `
+      <div class="step" data-done="${!!s.val}" onclick="toggleStep(event,'${p.chatid}','${s.campo}',${!!s.val})" title="">
+        ${s.icon}
+        <span class="step-tooltip">${s.label}</span>
+      </div>
+    `).join('');
+
+    const wa = p.whatsapp_cartao || p.chatid || '';
+    const waNum = wa.replace(/\D/g,'');
+    const valorFmt = p.valor_produto ? `<strong>R$ ${Number(p.valor_produto).toLocaleString('pt-BR',{minimumFractionDigits:2})}</strong>` : '—';
+    const dateFmt = p.updated_at ? new Date(p.updated_at).toLocaleDateString('pt-BR') : '—';
+
+    return `<tr onclick="openModal('${p.chatid}')" style="cursor:pointer">
+      <td>
+        <div class="client-info">
+          <span class="client-name">${p.nome_cliente || 'Sem nome'}</span>
+          <span class="client-ig">${p.instagram ? '@'+p.instagram : '—'}</span>
+        </div>
+      </td>
+      <td>
+        <a class="phone-link" href="https://wa.me/${waNum}" target="_blank" onclick="event.stopPropagation()">
+          ${wa.replace('@s.whatsapp.net','') || '—'}
+        </a>
+      </td>
+      <td><span class="valor">${valorFmt}</span></td>
+      <td>
+        <div class="steps" onclick="event.stopPropagation()">
+          ${stepsHtml}
+        </div>
+      </td>
+      <td style="font-size:11px;color:var(--text3)">${dateFmt}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('tableBody').innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Cliente</th>
+          <th>WhatsApp</th>
+          <th>Valor</th>
+          <th>Etapas</th>
+          <th>Atualizado</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+// TOGGLE ETAPA
+async function toggleStep(e, chatid, campo, valorAtual) {
+  e.stopPropagation();
+  const novoValor = !valorAtual;
+  try {
+    const r = await fetch(API + '/pedidos/' + encodeURIComponent(chatid), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ campo, valor: novoValor })
+    });
+    if (!r.ok) throw new Error('Erro ao atualizar');
+    const updated = await r.json();
+    const idx = allPedidos.findIndex(p => p.chatid === chatid);
+    if (idx >= 0) allPedidos[idx] = updated;
+    renderTable();
+    loadMetricas();
+    showToast('Atualizado!', 'success');
+  } catch(e) {
+    showToast('Erro ao atualizar', 'error');
+  }
+}
+
+// MODAL DETALHES
+function openModal(chatid) {
+  const p = allPedidos.find(x => x.chatid === chatid);
+  if (!p) return;
+  currentPedido = p;
+
+  document.getElementById('modalClientName').textContent = p.nome_cliente || 'Pedido';
+
+  const fields = [
+    ['Instagram', p.instagram ? '@' + p.instagram : '—'],
+    ['WhatsApp', (p.whatsapp_cartao || p.chatid || '—').replace('@s.whatsapp.net','')],
+    ['Produto', p.produto || '—'],
+    ['Quantidade', p.quantidade || '—'],
+    ['Corte', p.corte || '—'],
+    ['CEP', p.cep || '—'],
+    ['Valor Produto', p.valor_produto ? 'R$ ' + Number(p.valor_produto).toLocaleString('pt-BR',{minimumFractionDigits:2}) : '—'],
+    ['Valor Frete', p.valor_frete ? 'R$ ' + Number(p.valor_frete).toLocaleString('pt-BR',{minimumFractionDigits:2}) : '—'],
+    ['Link Rastreio', p.link_rastreio || '—'],
+    ['Pasta Drive', p.pasta_drive || '—'],
+  ];
+
+  document.getElementById('modalFields').innerHTML = fields.map(([l,v]) => `
+    <div class="modal-field">
+      <div class="modal-field-label">${l}</div>
+      <div class="modal-field-val">${v}</div>
+    </div>
+  `).join('');
+
+  const toggles = [
+    { campo: 'sinal_pago', label: 'Sinal pago', val: p.sinal_pago },
+    { campo: 'arte_enviada', label: 'Arte enviada', val: p.arte_enviada },
+    { campo: 'arte_aprovada', label: 'Arte aprovada', val: p.arte_aprovada },
+    { campo: 'pagamento_final', label: 'Pagamento final', val: p.pagamento_final },
+    { campo: 'postado', label: 'Postado', val: p.postado },
+  ];
+
+  document.getElementById('modalActions').innerHTML = `
+    ${toggles.map(t => `
+      <button class="toggle-btn" data-active="${!!t.val}" onclick="toggleFromModal('${p.chatid}','${t.campo}',${!!t.val})">
+        ${t.label}
+        <span class="toggle-indicator">${t.val ? 'Sim' : 'Não'}</span>
+      </button>
+    `).join('')}
+    <div style="margin-top:8px;">
+      <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:6px;">Link de rastreio</div>
+      <div class="rastreio-wrap">
+        <input class="rastreio-input" id="rastreioInput" placeholder="Cole o link aqui..." value="${p.link_rastreio || ''}">
+        <button class="btn-save" onclick="saveRastreio('${p.chatid}')">Salvar</button>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('modalBg').classList.add('open');
+}
+
+async function toggleFromModal(chatid, campo, valorAtual) {
+  await toggleStep({ stopPropagation: ()=>{} }, chatid, campo, valorAtual);
+  openModal(chatid);
+}
+
+async function saveRastreio(chatid) {
+  const val = document.getElementById('rastreioInput').value.trim();
+  try {
+    const r = await fetch(API + '/pedidos/' + encodeURIComponent(chatid), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ campo: 'link_rastreio', valor: val })
+    });
+    if (!r.ok) throw new Error();
+    const updated = await r.json();
+    const idx = allPedidos.findIndex(p => p.chatid === chatid);
+    if (idx >= 0) allPedidos[idx] = updated;
+    showToast('Rastreio salvo!', 'success');
+  } catch(e) {
+    showToast('Erro ao salvar', 'error');
+  }
+}
+
+function closeModal(e) { if (e.target === document.getElementById('modalBg')) closeModalDirect(); }
+function closeModalDirect() { document.getElementById('modalBg').classList.remove('open'); currentPedido = null; }
+
+// INIT
+if (!API) {
+  setTimeout(openConfig, 300);
+} else {
+  loadAll();
+}
+
+setInterval(loadAll, 60000);
+</script>
+</body>
+</html>
