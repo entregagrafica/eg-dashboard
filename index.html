@@ -107,6 +107,21 @@ tr:hover td{background:rgba(255,255,255,.02)}
 .config-input{width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:9px 12px;border-radius:var(--radius);font-family:var(--mono);font-size:12px;outline:none}
 .config-input:focus{border-color:var(--accent)}
 select.edit-input option{background:var(--surface2);color:var(--text)}
+
+.tabs{display:flex;gap:8px;margin-bottom:22px;border-bottom:1px solid var(--border);padding-bottom:12px;overflow-x:auto}
+.tab-btn{background:transparent;border:1px solid var(--border2);color:var(--text2);padding:8px 14px;border-radius:var(--radius);cursor:pointer;font-family:var(--font);font-size:13px;white-space:nowrap;transition:all .15s}
+.tab-btn:hover{border-color:var(--accent);color:var(--accent)}
+.tab-btn.active{background:rgba(200,240,96,.08);border-color:var(--accent);color:var(--accent)}
+.view{display:none}.view.active{display:block}
+.crm-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:20px}
+.crm-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px 18px;min-height:92px}
+.crm-card-title{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+.crm-card-value{font-size:24px;line-height:1;font-weight:600;color:var(--text)}
+.badge{display:inline-flex;align-items:center;border:1px solid var(--border2);border-radius:999px;padding:3px 8px;font-size:11px;color:var(--text2);background:var(--surface2)}
+.badge.warn{border-color:rgba(255,170,0,.35);color:var(--warning);background:rgba(255,170,0,.08)}
+.badge.info{border-color:rgba(85,170,255,.35);color:var(--info);background:rgba(85,170,255,.08)}
+.nowrap{white-space:nowrap}
+
 </style>
 </head>
 <body>
@@ -128,6 +143,15 @@ select.edit-input option{background:var(--surface2);color:var(--text)}
 </div>
 
 <div class="main">
+  <div class="tabs">
+    <button class="tab-btn active" id="tab-pedidos" onclick="setView('pedidos')">Pedidos</button>
+    <button class="tab-btn" id="tab-clientes" onclick="setView('clientes')">Clientes</button>
+    <button class="tab-btn" id="tab-leads" onclick="setView('leads')">Leads</button>
+    <button class="tab-btn" id="tab-atencao" onclick="setView('atencao')">Aten??o</button>
+    <button class="tab-btn" id="tab-historico" onclick="setView('historico')">Hist?rico</button>
+  </div>
+
+  <div class="view active" id="view-pedidos">
   <div class="metrics" id="metrics">
     <div class="metric" style="--m-color:#f0f0f0" onclick="setEtapa('')">
       <div class="metric-val" id="m-total">—</div>
@@ -188,6 +212,40 @@ select.edit-input option{background:var(--surface2);color:var(--text)}
     </div>
     <div id="tableBody"><div class="loading">Carregando...</div></div>
   </div>
+  </div>
+
+  <div class="view" id="view-clientes">
+    <div class="crm-grid">
+      <div class="crm-card"><div class="crm-card-title">Clientes</div><div class="crm-card-value" id="clientesTotal">?</div></div>
+      <div class="crm-card"><div class="crm-card-title">Compraram mais de uma vez</div><div class="crm-card-value" id="clientesRecorrentes">?</div></div>
+      <div class="crm-card"><div class="crm-card-title">Valor em clientes</div><div class="crm-card-value" id="clientesValor">?</div></div>
+    </div>
+    <div class="table-wrap">
+      <div class="table-header-bar"><div class="table-title">Clientes</div><div class="table-count" id="clientesCount">?</div></div>
+      <div id="clientesBody"><div class="loading">Carregando...</div></div>
+    </div>
+  </div>
+
+  <div class="view" id="view-leads">
+    <div class="table-wrap">
+      <div class="table-header-bar"><div class="table-title">Leads</div><div class="table-count" id="leadsCount">?</div></div>
+      <div id="leadsBody"><div class="loading">Carregando...</div></div>
+    </div>
+  </div>
+
+  <div class="view" id="view-atencao">
+    <div class="table-wrap">
+      <div class="table-header-bar"><div class="table-title">Precisa de aten??o</div><div class="table-count" id="atencaoCount">?</div></div>
+      <div id="atencaoBody"><div class="loading">Carregando...</div></div>
+    </div>
+  </div>
+
+  <div class="view" id="view-historico">
+    <div class="table-wrap">
+      <div class="table-header-bar"><div class="table-title">Hist?rico recente</div><div class="table-count" id="eventosCount">?</div></div>
+      <div id="eventosBody"><div class="loading">Carregando...</div></div>
+    </div>
+  </div>
 </div>
 
 <!-- MODAL PEDIDO -->
@@ -228,6 +286,11 @@ let etapaFiltro = '';
 let currentChatid = null;
 let sortOrder = 'asc';
 let currentStatusFilter = 'todos';
+let activeView = 'pedidos';
+let allClientes = [];
+let allLeads = [];
+let allAtencao = [];
+let allEventos = [];
 
 // UTILS
 function showToast(msg, type='') {
@@ -271,7 +334,8 @@ async function saveConfig() {
 // LOAD
 async function loadAll() {
   if (!API) { openConfig(); return; }
-  await Promise.all([loadMetricas(), loadPedidos()]);
+  await loadMetricas();
+  await loadCurrentView();
   document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('pt-BR');
 }
 
@@ -316,6 +380,106 @@ function clearFilters() {
   etapaFiltro = '';
   currentStatusFilter = 'todos';
   loadPedidos();
+}
+
+
+async function loadClientes() {
+  try {
+    allClientes = await (await fetch(API+'/clientes')).json();
+    renderClientes();
+  } catch(e) { document.getElementById('clientesBody').innerHTML = '<div class="empty">Erro ao carregar clientes.</div>'; }
+}
+
+async function loadLeads() {
+  try {
+    allLeads = await (await fetch(API+'/leads')).json();
+    renderLeads();
+  } catch(e) { document.getElementById('leadsBody').innerHTML = '<div class="empty">Erro ao carregar leads.</div>'; }
+}
+
+async function loadAtencao() {
+  try {
+    allAtencao = await (await fetch(API+'/atencao')).json();
+    renderAtencao();
+  } catch(e) { document.getElementById('atencaoBody').innerHTML = '<div class="empty">Erro ao carregar aten??o.</div>'; }
+}
+
+async function loadEventos() {
+  try {
+    allEventos = await (await fetch(API+'/eventos')).json();
+    renderEventos();
+  } catch(e) { document.getElementById('eventosBody').innerHTML = '<div class="empty">Erro ao carregar hist?rico.</div>'; }
+}
+
+function renderClientes() {
+  const clientes = [...allClientes];
+  document.getElementById('clientesTotal').textContent = clientes.length;
+  document.getElementById('clientesRecorrentes').textContent = clientes.filter(c => Number(c.total_pedidos) > 1).length;
+  const valor = clientes.reduce((sum, c) => sum + Number(c.valor_total || 0), 0);
+  document.getElementById('clientesValor').textContent = 'R$ ' + valor.toLocaleString('pt-BR',{minimumFractionDigits:2});
+  document.getElementById('clientesCount').textContent = clientes.length + ' cliente(s)';
+  if (!clientes.length) { document.getElementById('clientesBody').innerHTML = '<div class="empty">Nenhum cliente encontrado</div>'; return; }
+  document.getElementById('clientesBody').innerHTML = `<table><thead><tr>
+    <th>Cliente</th><th>WhatsApp</th><th>Instagram</th><th>Pedidos</th><th>Valor</th><th>Atualizado</th>
+  </tr></thead><tbody>${clientes.map(c => {
+    const wa = phoneClean(c.whatsapp_cartao || c.chatid);
+    return `<tr>
+      <td><div class="client-name">${esc(c.nome_cliente || 'Sem nome')}</div><div class="client-ig">${esc(c.origem || 'whatsapp')}</div></td>
+      <td><a class="phone-link" href="https://wa.me/${wa}" target="_blank">${esc((c.whatsapp_cartao || c.chatid || '').replace('@s.whatsapp.net',''))}</a></td>
+      <td>${c.instagram ? '@'+esc(c.instagram) : '?'}</td>
+      <td><span class="badge info">${Number(c.total_pedidos || 0)}</span></td>
+      <td><span class="valor"><strong>${fmt(c.valor_total)}</strong></span></td>
+      <td class="nowrap" style="color:var(--text3)">${fmtDate(c.updated_at || c.ultimo_pedido_at)}</td>
+    </tr>`;
+  }).join('')}</tbody></table>`;
+}
+
+function renderLeads() {
+  const leads = [...allLeads];
+  document.getElementById('leadsCount').textContent = leads.length + ' lead(s)';
+  if (!leads.length) { document.getElementById('leadsBody').innerHTML = '<div class="empty">Nenhum lead ainda. A estrutura j? est? pronta; falta alimentar leads pelo n8n.</div>'; return; }
+  document.getElementById('leadsBody').innerHTML = `<table><thead><tr>
+    <th>Cliente</th><th>Status</th><th>Interesse</th><th>Valor Est.</th><th>Follow-up</th><th>Atualizado</th>
+  </tr></thead><tbody>${leads.map(l => `<tr>
+    <td><div class="client-name">${esc(l.nome_cliente || 'Sem nome')}</div><div class="client-ig">${esc((l.chatid || '').replace('@s.whatsapp.net',''))}</div></td>
+    <td><span class="badge info">${esc(l.status || 'novo')}</span></td>
+    <td>${esc(l.interesse || '?')}</td>
+    <td><span class="valor">${fmt(l.valor_estimado)}</span></td>
+    <td class="nowrap">${fmtDate(l.proximo_followup)}</td>
+    <td class="nowrap" style="color:var(--text3)">${fmtDate(l.updated_at)}</td>
+  </tr>`).join('')}</tbody></table>`;
+}
+
+function renderAtencao() {
+  const itens = [...allAtencao];
+  document.getElementById('atencaoCount').textContent = itens.length + ' item(ns)';
+  if (!itens.length) { document.getElementById('atencaoBody').innerHTML = '<div class="empty">Nada cr?tico agora</div>'; return; }
+  document.getElementById('atencaoBody').innerHTML = `<table><thead><tr>
+    <th>Tipo</th><th>Cliente</th><th>Pedido</th><th>Motivo</th><th>Status</th><th>Atualizado</th>
+  </tr></thead><tbody>${itens.map(i => `<tr>
+    <td><span class="badge warn">${esc(i.tipo)}</span></td>
+    <td><div class="client-name">${esc(i.nome_cliente || 'Sem nome')}</div><div class="client-ig">${esc((i.chatid || '').replace('@s.whatsapp.net',''))}</div></td>
+    <td>${esc(i.codigo || i.pedido_id || '?')}</td>
+    <td>${esc(i.motivo || '?')}</td>
+    <td><span class="badge">${esc(i.status || '?')}</span></td>
+    <td class="nowrap" style="color:var(--text3)">${fmtDate(i.updated_at)}</td>
+  </tr>`).join('')}</tbody></table>`;
+}
+
+function renderEventos() {
+  const eventos = [...allEventos];
+  document.getElementById('eventosCount').textContent = eventos.length + ' evento(s)';
+  if (!eventos.length) { document.getElementById('eventosBody').innerHTML = '<div class="empty">Nenhum evento registrado</div>'; return; }
+  document.getElementById('eventosBody').innerHTML = `<table><thead><tr>
+    <th>Quando</th><th>Tipo</th><th>Cliente</th><th>Pedido</th><th>Descri??o</th><th>Origem</th>
+  </tr></thead><tbody>${eventos.map(e => `<tr>
+    <td class="nowrap" style="color:var(--text3)">${fmtDate(e.created_at)}</td>
+    <td><span class="badge info">${esc(e.tipo)}</span></td>
+    <td><div class="client-name">${esc(e.nome_cliente || '?')}</div><div class="client-ig">${esc((e.chatid || '').replace('@s.whatsapp.net',''))}</div></td>
+    <td>${esc(e.codigo || e.pedido_id || '?')}</td>
+    <td>${esc(e.descricao || '?')}</td>
+    <td><span class="badge">${esc(e.origem || '?')}</span></td>
+  </tr>`).join('')}</tbody></table>`;
 }
 
 // RENDER
