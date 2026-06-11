@@ -147,8 +147,8 @@ select.edit-input option{background:var(--surface2);color:var(--text)}
     <button class="tab-btn active" id="tab-pedidos" onclick="setView('pedidos')">Pedidos</button>
     <button class="tab-btn" id="tab-clientes" onclick="setView('clientes')">Clientes</button>
     <button class="tab-btn" id="tab-leads" onclick="setView('leads')">Leads</button>
-    <button class="tab-btn" id="tab-atencao" onclick="setView('atencao')">Aten??o</button>
-    <button class="tab-btn" id="tab-historico" onclick="setView('historico')">Hist?rico</button>
+    <button class="tab-btn" id="tab-atencao" onclick="setView('atencao')">Atenção</button>
+    <button class="tab-btn" id="tab-historico" onclick="setView('historico')">Histórico</button>
   </div>
 
   <div class="view active" id="view-pedidos">
@@ -242,7 +242,7 @@ select.edit-input option{background:var(--surface2);color:var(--text)}
 
   <div class="view" id="view-historico">
     <div class="table-wrap">
-      <div class="table-header-bar"><div class="table-title">Hist?rico recente</div><div class="table-count" id="eventosCount">?</div></div>
+      <div class="table-header-bar"><div class="table-title">Histórico recente</div><div class="table-count" id="eventosCount">?</div></div>
       <div id="eventosBody"><div class="loading">Carregando...</div></div>
     </div>
   </div>
@@ -302,6 +302,28 @@ function fmt(v) { return v ? 'R$ ' + Number(v).toLocaleString('pt-BR',{minimumFr
 function fmtDate(v) { return v ? new Date(v).toLocaleDateString('pt-BR') : '—'; }
 
 // ORDENAÇÃO
+
+function esc(v) { return String(v ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function phoneClean(v) { return String(v || '').replace('@s.whatsapp.net','').replace(/\D/g,''); }
+function setView(view) {
+  activeView = view;
+  ['pedidos','clientes','leads','atencao','historico'].forEach(v => {
+    const tab = document.getElementById('tab-' + v);
+    const pane = document.getElementById('view-' + v);
+    if (tab) tab.classList.toggle('active', v === view);
+    if (pane) pane.classList.toggle('active', v === view);
+  });
+  loadCurrentView();
+}
+async function loadCurrentView() {
+  if (!API) { openConfig(); return; }
+  if (activeView === 'pedidos') return loadPedidos();
+  if (activeView === 'clientes') return loadClientes();
+  if (activeView === 'leads') return loadLeads();
+  if (activeView === 'atencao') return loadAtencao();
+  if (activeView === 'historico') return loadEventos();
+}
+
 function toggleSort() {
   sortOrder = sortOrder === 'asc' ? 'desc' : 'asc';
   const btn = document.getElementById('sortBtn');
@@ -408,7 +430,7 @@ async function loadEventos() {
   try {
     allEventos = await (await fetch(API+'/eventos')).json();
     renderEventos();
-  } catch(e) { document.getElementById('eventosBody').innerHTML = '<div class="empty">Erro ao carregar hist?rico.</div>'; }
+  } catch(e) { document.getElementById('eventosBody').innerHTML = '<div class="empty">Erro ao carregar histórico.</div>'; }
 }
 
 function renderClientes() {
@@ -437,7 +459,7 @@ function renderClientes() {
 function renderLeads() {
   const leads = [...allLeads];
   document.getElementById('leadsCount').textContent = leads.length + ' lead(s)';
-  if (!leads.length) { document.getElementById('leadsBody').innerHTML = '<div class="empty">Nenhum lead ainda. A estrutura j? est? pronta; falta alimentar leads pelo n8n.</div>'; return; }
+  if (!leads.length) { document.getElementById('leadsBody').innerHTML = '<div class="empty">Nenhum lead ainda. A estrutura já está pronta; falta alimentar leads pelo n8n.</div>'; return; }
   document.getElementById('leadsBody').innerHTML = `<table><thead><tr>
     <th>Cliente</th><th>Status</th><th>Interesse</th><th>Valor Est.</th><th>Follow-up</th><th>Atualizado</th>
   </tr></thead><tbody>${leads.map(l => `<tr>
