@@ -187,7 +187,7 @@ select.edit-input option{background:var(--surface2);color:var(--text)}
     <label>De <input type="date" id="f-inicio" onchange="applyFilters()"></label>
     <label>Até <input type="date" id="f-fim" onchange="applyFilters()"></label>
     <select id="f-status" onchange="applyFilters()">
-      <option value="todos">Todos os status</option>
+      <option value="todos">Pedidos com sinal</option>
       <option value="novo">Novo</option>
       <option value="em_producao">Em produção</option>
       <option value="aguardando_aprovacao">Aguardando aprovação</option>
@@ -379,6 +379,9 @@ async function loadPedidos() {
     const params = new URLSearchParams();
     currentStatusFilter = document.getElementById('f-status').value;
     // sinal_pago e sem_sinal são filtros locais — não mandar pro servidor
+    if (currentStatusFilter === 'sem_sinal') {
+      params.set('incluir_sem_sinal', 'true');
+    }
     if (currentStatusFilter !== 'todos' && currentStatusFilter !== 'sinal_pago' && currentStatusFilter !== 'sem_sinal' && currentStatusFilter !== 'ordem_manual') {
       params.set('status', currentStatusFilter);
     }
