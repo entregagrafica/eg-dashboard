@@ -533,8 +533,8 @@ function renderTable() {
     pedidos.sort((a, b) => a.ordem - b.ordem);
   } else {
     pedidos.sort((a, b) => {
-      const da = new Date(a.data_sinal || a.updated_at || a.created_at || 0);
-      const db = new Date(b.data_sinal || b.updated_at || b.created_at || 0);
+      const da = new Date(a.data_sinal || a.created_at || 0);
+      const db = new Date(b.data_sinal || b.created_at || 0);
       return sortOrder === 'asc' ? da - db : db - da;
     });
   }
@@ -552,17 +552,17 @@ function renderTable() {
       {campo:'postado',icon:'▲',label:'Postado',val:p.postado},
     ];
     const stepsHtml = steps.map(s => `
-      <div class="step" data-done="${!!s.val}" onclick="toggleStep(event,'${p.chatid}','${s.campo}',${!!s.val})">
+      <div class="step" data-done="${!!s.val}" onclick="toggleStep(event,'${p.pedido_id}','${s.campo}',${!!s.val})">
         ${s.icon}<span class="step-tooltip">${s.label}</span>
       </div>`).join('');
     const wa = (p.whatsapp_cartao || p.chatid || '').replace('@s.whatsapp.net','');
     const waNum = wa.replace(/\D/g,'');
-    return `<tr onclick="openModal('${p.chatid}')" style="cursor:pointer">
+    return `<tr onclick="openModal('${p.pedido_id}')" style="cursor:pointer">
       <td style="font-size:11px;color:var(--text3);font-family:var(--mono);width:36px;text-align:center;font-weight:500">${num}</td>
       <td style="width:52px;text-align:center" onclick="event.stopPropagation()">
         <input class="ordem-input" type="number" min="1" value="${p.ordem != null ? p.ordem : ''}" placeholder="—" title="Ordem manual"
           onkeydown="if(event.key==='Enter'){this.blur()}"
-          onblur="saveOrdem('${p.chatid}', this.value)"/>
+          onblur="saveOrdem('${p.pedido_id}', this.value)"/>
       </td>
       <td><div class="client-name">${p.nome_cliente||'Sem nome'}</div><div class="client-ig">${p.instagram?'@'+p.instagram:'—'}</div></td>
       <td><a class="phone-link" href="https://wa.me/${waNum}" target="_blank" onclick="event.stopPropagation()">${wa||'—'}</a></td>
@@ -616,10 +616,10 @@ async function saveOrdem(chatid, valor) {
 }
 
 // MODAL EDIÇÃO
-function openModal(chatid) {
-  const p = allPedidos.find(x => x.chatid===chatid);
+function openModal(pedidoId) {
+  const p = allPedidos.find(x => String(x.pedido_id)===String(pedidoId) || x.chatid===pedidoId);
   if (!p) return;
-  currentChatid = chatid;
+  currentChatid = p.chatid;
   document.getElementById('modalTitle').textContent = p.nome_cliente || 'Pedido';
 
   const toggles = [
@@ -668,7 +668,7 @@ function openModal(chatid) {
     <div class="modal-section">
       <div class="modal-section-title">Etapas</div>
       ${toggles.map(t => `
-        <button class="toggle-btn" data-active="${!!t.val}" onclick="toggleStep(event,'${chatid}','${t.campo}',${!!t.val});setTimeout(()=>openModal('${chatid}'),400)">
+        <button class="toggle-btn" data-active="${!!t.val}" onclick="toggleStep(event,'${p.pedido_id}','${t.campo}',${!!t.val});setTimeout(()=>openModal('${p.pedido_id}'),400)">
           ${t.label}<span class="toggle-indicator">${t.val?'Sim':'Não'}</span>
         </button>`).join('')}
     </div>
@@ -681,8 +681,8 @@ function openModal(chatid) {
     </div>
 
     <div class="modal-footer">
-      <button class="btn btn-danger" onclick="deletePedido('${chatid}')">🗑 Apagar pedido</button>
-      <button class="btn btn-primary" onclick="savePedido('${chatid}')">Salvar alterações</button>
+      <button class="btn btn-danger" onclick="deletePedido('${p.pedido_id}')">🗑 Apagar pedido</button>
+      <button class="btn btn-primary" onclick="savePedido('${p.pedido_id}')">Salvar alterações</button>
     </div>
   `;
 
