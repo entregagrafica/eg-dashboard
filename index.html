@@ -188,6 +188,7 @@ select.edit-input option{background:var(--surface2);color:var(--text)}
     <label>Até <input type="date" id="f-fim" onchange="applyFilters()"></label>
     <select id="f-status" onchange="applyFilters()">
       <option value="todos">Pedidos com sinal</option>
+      <option value="nao_finalizados">Não finalizados</option>
       <option value="novo">Novo</option>
       <option value="em_producao">Em produção</option>
       <option value="aguardando_aprovacao">Aguardando aprovação</option>
@@ -378,11 +379,11 @@ async function loadPedidos() {
   try {
     const params = new URLSearchParams();
     currentStatusFilter = document.getElementById('f-status').value;
-    // sinal_pago e sem_sinal são filtros locais — não mandar pro servidor
-    if (currentStatusFilter === 'sem_sinal') {
+    // Alguns filtros precisam incluir conversas/pedidos sem sinal para edição.
+    if (currentStatusFilter === 'sem_sinal' || currentStatusFilter === 'nao_finalizados') {
       params.set('incluir_sem_sinal', 'true');
     }
-    if (currentStatusFilter !== 'todos' && currentStatusFilter !== 'sinal_pago' && currentStatusFilter !== 'sem_sinal' && currentStatusFilter !== 'ordem_manual') {
+    if (currentStatusFilter !== 'todos' && currentStatusFilter !== 'sinal_pago' && currentStatusFilter !== 'sem_sinal' && currentStatusFilter !== 'nao_finalizados' && currentStatusFilter !== 'ordem_manual') {
       params.set('status', currentStatusFilter);
     }
     const di = document.getElementById('f-inicio').value;
@@ -525,6 +526,9 @@ function renderTable() {
   // Filtros locais
   if (currentStatusFilter === 'sinal_pago') pedidos = pedidos.filter(p => p.sinal_pago);
   if (currentStatusFilter === 'sem_sinal') pedidos = pedidos.filter(p => !p.sinal_pago);
+  if (currentStatusFilter === 'nao_finalizados') {
+    pedidos = pedidos.filter(p => !['finalizado','postado','cancelado','arquivado'].includes(String(p.status || '').toLowerCase()));
+  }
   if (currentStatusFilter === 'ordem_manual') pedidos = pedidos.filter(p => p.ordem != null);
 
   // Ordenação
