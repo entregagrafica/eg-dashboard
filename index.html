@@ -301,6 +301,11 @@ function showToast(msg, type='') {
 }
 function fmt(v) { return v ? 'R$ ' + Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2}) : '—'; }
 function fmtDate(v) { return v ? new Date(v).toLocaleDateString('pt-BR') : '—'; }
+function fmtDateInput(v) {
+  if (!v) return '';
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
+}
 
 // ORDENAÇÃO
 
@@ -585,34 +590,49 @@ function renderTable() {
 }
 
 // TOGGLE RÁPIDO
-async function toggleStep(e, chatid, campo, val) {
+async function toggleStep(e, pedidoId, campo, val) {
   e.stopPropagation();
+  const idx = allPedidos.findIndex(p => String(p.pedido_id) === String(pedidoId));
+  const before = idx >= 0 ? {...allPedidos[idx]} : null;
+  if (idx >= 0) {
+    allPedidos[idx] = {...allPedidos[idx], [campo]: !val};
+    if (campo === 'sinal_pago' && !val && !allPedidos[idx].data_sinal) {
+      allPedidos[idx].data_sinal = new Date().toISOString();
+    }
+    renderTable();
+  }
   try {
-    const r = await fetch(API+'/pedidos/'+encodeURIComponent(chatid), {
+    const r = await fetch(API+'/pedidos/'+encodeURIComponent(pedidoId), {
       method:'PATCH', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({campo, valor: !val})
     });
     if (!r.ok) throw new Error();
     const updated = await r.json();
-    const idx = allPedidos.findIndex(p => p.chatid===chatid);
-    if (idx>=0) allPedidos[idx] = updated;
+    const updatedIdx = allPedidos.findIndex(p => String(p.pedido_id) === String(pedidoId));
+    if (updatedIdx>=0) allPedidos[updatedIdx] = updated;
     renderTable(); loadMetricas();
     showToast('Atualizado!','success');
-  } catch { showToast('Erro','error'); }
+  } catch {
+    if (idx >= 0 && before) {
+      allPedidos[idx] = before;
+      renderTable();
+    }
+    showToast('Erro','error');
+  }
 }
 
 // SALVAR ORDEM MANUAL
-async function saveOrdem(chatid, valor) {
+async function saveOrdem(pedidoId, valor) {
   const num = valor === '' ? null : parseInt(valor);
   if (valor !== '' && isNaN(num)) return;
   try {
-    const r = await fetch(API+'/pedidos/'+encodeURIComponent(chatid), {
+    const r = await fetch(API+'/pedidos/'+encodeURIComponent(pedidoId), {
       method:'PATCH', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({campo:'ordem', valor: num})
     });
     if (!r.ok) throw new Error();
     const updated = await r.json();
-    const idx = allPedidos.findIndex(p => p.chatid===chatid);
+    const idx = allPedidos.findIndex(p => String(p.pedido_id)===String(pedidoId));
     if (idx>=0) allPedidos[idx] = updated;
     renderTable();
     showToast('Ordem salva!','success');
@@ -668,6 +688,10 @@ function openModal(pedidoId) {
         </select>
       </div>
     </div>
+    <div class="edit-row">
+      <div class="edit-field"><div class="edit-label">Data do sinal</div><input class="edit-input" id="e-data-sinal" type="date" value="${fmtDateInput(p.data_sinal)}"></div>
+      <div class="edit-field"><div class="edit-label">Código</div><input class="edit-input" value="${p.codigo||''}" disabled></div>
+    </div>
 
     <div class="modal-section">
       <div class="modal-section-title">Etapas</div>
@@ -693,7 +717,7 @@ function openModal(pedidoId) {
   document.getElementById('modalBg').classList.add('open');
 }
 
-async function savePedido(chatid) {
+async function savePedido(pedidoId) {
   const updates = {
     nome_cliente: document.getElementById('e-nome').value,
     instagram: document.getElementById('e-ig').value,
@@ -705,16 +729,17 @@ async function savePedido(chatid) {
     quantidade: document.getElementById('e-qtd').value || null,
     corte: document.getElementById('e-corte').value,
     status: document.getElementById('e-status').value,
+    data_sinal: document.getElementById('e-data-sinal').value || null,
     link_rastreio: document.getElementById('e-rastreio').value,
   };
   try {
-    const r = await fetch(API+'/pedidos/'+encodeURIComponent(chatid), {
+    const r = await fetch(API+'/pedidos/'+encodeURIComponent(pedidoId), {
       method:'PATCH', headers:{'Content-Type':'application/json'},
       body: JSON.stringify(updates)
     });
     if (!r.ok) throw new Error();
     const updated = await r.json();
-    const idx = allPedidos.findIndex(p => p.chatid===chatid);
+    const idx = allPedidos.findIndex(p => String(p.pedido_id)===String(pedidoId));
     if (idx>=0) allPedidos[idx] = updated;
     renderTable(); loadMetricas();
     closeModalDirect();
@@ -722,12 +747,12 @@ async function savePedido(chatid) {
   } catch { showToast('Erro ao salvar','error'); }
 }
 
-async function deletePedido(chatid) {
+async function deletePedido(pedidoId) {
   if (!confirm('Apagar este pedido? Essa ação não pode ser desfeita.')) return;
   try {
-    const r = await fetch(API+'/pedidos/'+encodeURIComponent(chatid), { method:'DELETE' });
+    const r = await fetch(API+'/pedidos/'+encodeURIComponent(pedidoId), { method:'DELETE' });
     if (!r.ok) throw new Error();
-    allPedidos = allPedidos.filter(p => p.chatid !== chatid);
+    allPedidos = allPedidos.filter(p => String(p.pedido_id) !== String(pedidoId));
     renderTable(); loadMetricas();
     closeModalDirect();
     showToast('Pedido apagado','success');
