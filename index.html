@@ -542,8 +542,8 @@ function renderTable() {
     pedidos.sort((a, b) => a.ordem - b.ordem);
   } else {
     pedidos.sort((a, b) => {
-      const da = new Date(a.data_sinal || a.created_at || 0);
-      const db = new Date(b.data_sinal || b.created_at || 0);
+      const da = new Date(a.data_sinal || a.updated_at || a.created_at || 0);
+      const db = new Date(b.data_sinal || b.updated_at || b.created_at || 0);
       return sortOrder === 'asc' ? da - db : db - da;
     });
   }
