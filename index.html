@@ -121,6 +121,20 @@ select.edit-input option{background:var(--surface2);color:var(--text)}
 .badge.warn{border-color:rgba(255,170,0,.35);color:var(--warning);background:rgba(255,170,0,.08)}
 .badge.info{border-color:rgba(85,170,255,.35);color:var(--info);background:rgba(85,170,255,.08)}
 .nowrap{white-space:nowrap}
+.conversation-layout{display:grid;grid-template-columns:minmax(260px,360px) minmax(0,1fr);min-height:65vh;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+.conversation-list{border-right:1px solid var(--border);overflow:auto;max-height:70vh}
+.conversation-head{padding:15px 18px;border-bottom:1px solid var(--border);color:var(--text2);font-size:13px;font-weight:500}
+.conversation-item{width:100%;padding:13px 16px;border:0;border-bottom:1px solid var(--border);background:transparent;color:var(--text);text-align:left;cursor:pointer;font-family:var(--font)}
+.conversation-item:hover,.conversation-item.active{background:rgba(200,240,96,.06)}
+.conversation-item.active{box-shadow:inset 3px 0 var(--accent)}
+.conversation-name{font-weight:500;font-size:13px;display:flex;justify-content:space-between;gap:8px}.conversation-time{font-size:10px;color:var(--text3);font-family:var(--mono);white-space:nowrap}
+.conversation-preview{font-size:12px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:3px}.conversation-meta{font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:3px}
+.chat-panel{display:flex;flex-direction:column;min-height:65vh}.chat-head{padding:15px 18px;border-bottom:1px solid var(--border)}.chat-title{font-size:14px;font-weight:500}.chat-subtitle{font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:2px}
+.message-list{padding:18px;display:flex;flex-direction:column;gap:9px;overflow:auto;max-height:62vh;background:linear-gradient(135deg,rgba(255,255,255,.012),transparent)}
+.message{max-width:82%;padding:9px 11px;border-radius:10px;font-size:13px;line-height:1.45;white-space:pre-wrap;word-break:break-word;border:1px solid var(--border2)}
+.message.in{align-self:flex-start;background:var(--surface2);border-bottom-left-radius:2px}.message.out{align-self:flex-end;background:rgba(200,240,96,.1);border-color:rgba(200,240,96,.22);border-bottom-right-radius:2px}
+.message-meta{font-family:var(--mono);font-size:9px;color:var(--text3);margin-top:4px}.chat-empty{display:flex;align-items:center;justify-content:center;flex:1;color:var(--text3);padding:30px;text-align:center}
+@media(max-width:760px){.header{padding:14px 16px}.header-right .last-update,.header-right .btn:not(:first-of-type){display:none}.main{padding:18px 14px}.conversation-layout{grid-template-columns:1fr}.conversation-list{max-height:38vh;border-right:0;border-bottom:1px solid var(--border)}.chat-panel{min-height:50vh}.message-list{max-height:45vh}.edit-row{grid-template-columns:1fr}.table-wrap{overflow-x:auto}}
 
 </style>
 </head>
@@ -148,6 +162,7 @@ select.edit-input option{background:var(--surface2);color:var(--text)}
     <button class="tab-btn" id="tab-clientes" onclick="setView('clientes')">Clientes</button>
     <button class="tab-btn" id="tab-leads" onclick="setView('leads')">Leads</button>
     <button class="tab-btn" id="tab-atencao" onclick="setView('atencao')">Atenção</button>
+    <button class="tab-btn" id="tab-conversas" onclick="setView('conversas')">Conversas</button>
     <button class="tab-btn" id="tab-historico" onclick="setView('historico')">Histórico</button>
   </div>
 
@@ -247,6 +262,19 @@ select.edit-input option{background:var(--surface2);color:var(--text)}
       <div id="eventosBody"><div class="loading">Carregando...</div></div>
     </div>
   </div>
+
+  <div class="view" id="view-conversas">
+    <div class="conversation-layout">
+      <div class="conversation-list">
+        <div class="conversation-head">Conversas do WhatsApp <span id="conversasCount" class="table-count" style="float:right"></span></div>
+        <div id="conversasBody"><div class="loading">Carregando conversas...</div></div>
+      </div>
+      <div class="chat-panel">
+        <div class="chat-head"><div class="chat-title" id="chatTitle">Selecione uma conversa</div><div class="chat-subtitle" id="chatSubtitle">O histórico é somente leitura nesta primeira versão.</div></div>
+        <div class="message-list" id="mensagensBody"><div class="chat-empty">Escolha uma conversa à esquerda para ver o histórico completo.</div></div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- MODAL PEDIDO -->
@@ -271,6 +299,10 @@ select.edit-input option{background:var(--surface2);color:var(--text)}
       <div class="config-label">URL da API</div>
       <input class="config-input" id="apiUrlInput" placeholder="https://api.seudominio.com">
     </div>
+    <div class="config-field">
+      <div class="config-label">Chave de acesso da API</div>
+      <input class="config-input" id="apiTokenInput" type="password" placeholder="Use apenas quando a API estiver protegida">
+    </div>
     <div style="margin-top:16px;display:flex;gap:8px">
       <button class="btn btn-primary" onclick="saveConfig()">Salvar e testar</button>
     </div>
@@ -282,6 +314,7 @@ select.edit-input option{background:var(--surface2);color:var(--text)}
 
 <script>
 let API = localStorage.getItem('eg_api_url') || '';
+let apiToken = localStorage.getItem('eg_api_token') || '';
 let allPedidos = [];
 let etapaFiltro = '';
 let currentChatid = null;
@@ -292,6 +325,8 @@ let allClientes = [];
 let allLeads = [];
 let allAtencao = [];
 let allEventos = [];
+let allConversas = [];
+let conversaSelecionada = null;
 
 // UTILS
 function showToast(msg, type='') {
@@ -311,9 +346,14 @@ function fmtDateInput(v) {
 
 function esc(v) { return String(v ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function phoneClean(v) { return String(v || '').replace('@s.whatsapp.net','').replace(/\D/g,''); }
+function apiFetch(path, options = {}) {
+  const headers = {...(options.headers || {})};
+  if (apiToken) headers.Authorization = 'Bearer ' + apiToken;
+  return fetch(API + path, {...options, headers});
+}
 function setView(view) {
   activeView = view;
-  ['pedidos','clientes','leads','atencao','historico'].forEach(v => {
+  ['pedidos','clientes','leads','atencao','conversas','historico'].forEach(v => {
     const tab = document.getElementById('tab-' + v);
     const pane = document.getElementById('view-' + v);
     if (tab) tab.classList.toggle('active', v === view);
@@ -327,6 +367,7 @@ async function loadCurrentView() {
   if (activeView === 'clientes') return loadClientes();
   if (activeView === 'leads') return loadLeads();
   if (activeView === 'atencao') return loadAtencao();
+  if (activeView === 'conversas') return loadConversas();
   if (activeView === 'historico') return loadEventos();
 }
 
@@ -340,16 +381,17 @@ function toggleSort() {
 }
 
 // CONFIG
-function openConfig() { document.getElementById('apiUrlInput').value = API; document.getElementById('configStatus').textContent = ''; document.getElementById('configBg').classList.add('open'); }
+function openConfig() { document.getElementById('apiUrlInput').value = API; document.getElementById('apiTokenInput').value = apiToken; document.getElementById('configStatus').textContent = ''; document.getElementById('configBg').classList.add('open'); }
 function closeConfig(e) { if (e.target===document.getElementById('configBg')) closeConfigDirect(); }
 function closeConfigDirect() { document.getElementById('configBg').classList.remove('open'); }
 async function saveConfig() {
   const url = document.getElementById('apiUrlInput').value.trim().replace(/\/$/,'');
+  const token = document.getElementById('apiTokenInput').value.trim();
   document.getElementById('configStatus').textContent = 'Testando...';
   try {
-    const r = await fetch(url + '/metricas');
+    const r = await fetch(url + '/metricas', {headers: token ? {Authorization: 'Bearer ' + token} : {}});
     if (!r.ok) throw new Error('Status ' + r.status);
-    API = url; localStorage.setItem('eg_api_url', API);
+    API = url; apiToken = token; localStorage.setItem('eg_api_url', API); localStorage.setItem('eg_api_token', apiToken);
     document.getElementById('configStatus').textContent = '✓ Conectado!';
     document.getElementById('configStatus').style.color = 'var(--success)';
     setTimeout(() => { closeConfigDirect(); loadAll(); }, 800);
@@ -369,7 +411,7 @@ async function loadAll() {
 
 async function loadMetricas() {
   try {
-    const d = await (await fetch(API+'/metricas')).json();
+    const d = await (await apiFetch('/metricas')).json();
     document.getElementById('m-total').textContent = d.total;
     document.getElementById('m-arte').textContent = d.aguardando_arte;
     document.getElementById('m-aprov').textContent = d.aguardando_aprovacao;
@@ -395,7 +437,7 @@ async function loadPedidos() {
     const df = document.getElementById('f-fim').value;
     if (di) params.set('data_inicio', di);
     if (df) params.set('data_fim', df);
-    allPedidos = await (await fetch(API+'/pedidos?'+params)).json();
+    allPedidos = await (await apiFetch('/pedidos?'+params)).json();
     renderTable();
   } catch(e) {
     document.getElementById('tableBody').innerHTML = '<div class="empty">Erro ao carregar. Verifique a API.</div>';
@@ -416,30 +458,94 @@ function clearFilters() {
 
 async function loadClientes() {
   try {
-    allClientes = await (await fetch(API+'/clientes')).json();
+    allClientes = await (await apiFetch('/clientes')).json();
     renderClientes();
   } catch(e) { document.getElementById('clientesBody').innerHTML = '<div class="empty">Erro ao carregar clientes.</div>'; }
 }
 
 async function loadLeads() {
   try {
-    allLeads = await (await fetch(API+'/leads')).json();
+    allLeads = await (await apiFetch('/leads')).json();
     renderLeads();
   } catch(e) { document.getElementById('leadsBody').innerHTML = '<div class="empty">Erro ao carregar leads.</div>'; }
 }
 
 async function loadAtencao() {
   try {
-    allAtencao = await (await fetch(API+'/atencao')).json();
+    allAtencao = await (await apiFetch('/atencao')).json();
     renderAtencao();
   } catch(e) { document.getElementById('atencaoBody').innerHTML = '<div class="empty">Erro ao carregar aten??o.</div>'; }
 }
 
 async function loadEventos() {
   try {
-    allEventos = await (await fetch(API+'/eventos')).json();
+    allEventos = await (await apiFetch('/eventos')).json();
     renderEventos();
   } catch(e) { document.getElementById('eventosBody').innerHTML = '<div class="empty">Erro ao carregar histórico.</div>'; }
+}
+
+async function loadConversas() {
+  try {
+    const r = await apiFetch('/conversas?limite=200');
+    if (!r.ok) throw new Error('Não foi possível carregar as conversas');
+    allConversas = await r.json();
+    renderConversas();
+    if (conversaSelecionada) {
+      const aindaExiste = allConversas.some(c => c.instance_name === conversaSelecionada.instance_name && c.chatid === conversaSelecionada.chatid);
+      if (!aindaExiste) conversaSelecionada = null;
+    }
+  } catch(e) {
+    document.getElementById('conversasBody').innerHTML = '<div class="empty">Erro ao carregar conversas. Confira a conexão da API.</div>';
+  }
+}
+
+function fmtDateTime(v) {
+  if (!v) return '—';
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString('pt-BR', {dateStyle:'short', timeStyle:'short'});
+}
+
+function renderConversas() {
+  const body = document.getElementById('conversasBody');
+  document.getElementById('conversasCount').textContent = allConversas.length;
+  if (!allConversas.length) { body.innerHTML = '<div class="empty">Nenhuma conversa registrada ainda.</div>'; return; }
+  body.innerHTML = allConversas.map((c, index) => {
+    const active = conversaSelecionada && conversaSelecionada.instance_name === c.instance_name && conversaSelecionada.chatid === c.chatid;
+    const nome = c.nome_cliente || c.chatid.replace('@s.whatsapp.net','');
+    const preview = c.ultima_mensagem || (c.message_type ? '[' + c.message_type + ']' : 'Mensagem sem texto');
+    return `<button class="conversation-item ${active ? 'active' : ''}" onclick="abrirConversa(${index})">
+      <div class="conversation-name"><span>${esc(nome)}</span><span class="conversation-time">${esc(fmtDateTime(c.ultima_atividade))}</span></div>
+      <div class="conversation-preview">${esc(preview)}</div>
+      <div class="conversation-meta">${esc(c.entradas || 0)} recebidas · ${esc(c.saidas || 0)} enviadas</div>
+    </button>`;
+  }).join('');
+}
+
+async function abrirConversa(index) {
+  const conversa = allConversas[index];
+  if (!conversa) return;
+  conversaSelecionada = conversa;
+  renderConversas();
+  document.getElementById('chatTitle').textContent = conversa.nome_cliente || conversa.chatid.replace('@s.whatsapp.net','');
+  document.getElementById('chatSubtitle').textContent = conversa.chatid + ' · ' + conversa.instance_name;
+  const body = document.getElementById('mensagensBody');
+  body.innerHTML = '<div class="chat-empty">Carregando mensagens...</div>';
+  try {
+    const r = await apiFetch('/conversas/' + encodeURIComponent(conversa.instance_name) + '/' + encodeURIComponent(conversa.chatid) + '/mensagens?limite=250');
+    if (!r.ok) throw new Error();
+    const mensagens = await r.json();
+    if (!mensagens.length) { body.innerHTML = '<div class="chat-empty">Ainda não há mensagens salvas nesta conversa.</div>'; return; }
+    body.innerHTML = mensagens.map(m => {
+      const direcao = String(m.direcao || '').toLowerCase();
+      const enviada = direcao.includes('said') || direcao.includes('out');
+      const texto = m.texto || '[' + (m.message_type || 'mensagem sem texto') + ']';
+      const meta = (enviada ? 'Enviada' : 'Recebida') + ' · ' + fmtDateTime(m.ocorrido_em);
+      return `<div class="message ${enviada ? 'out' : 'in'}">${esc(texto)}<div class="message-meta">${esc(meta)}</div></div>`;
+    }).join('');
+    body.scrollTop = body.scrollHeight;
+  } catch(e) {
+    body.innerHTML = '<div class="chat-empty">Não foi possível carregar as mensagens dessa conversa.</div>';
+  }
 }
 
 function renderClientes() {
@@ -554,14 +660,14 @@ function renderTable() {
   const rows = pedidos.map((p, index) => {
     const num = index + 1;
     const steps = [
-      {campo:'sinal_pago',icon:'$',label:'Sinal',val:p.sinal_pago},
+      {campo:'sinal_pago',icon:'$',label:'Sinal (somente confirmação auditável)',val:p.sinal_pago,locked:true},
       {campo:'arte_enviada',icon:'✎',label:'Arte',val:p.arte_enviada},
       {campo:'arte_aprovada',icon:'✓',label:'Aprovada',val:p.arte_aprovada},
       {campo:'pagamento_final',icon:'₿',label:'Pgto Final',val:p.pagamento_final},
       {campo:'postado',icon:'▲',label:'Postado',val:p.postado},
     ];
     const stepsHtml = steps.map(s => `
-      <div class="step" data-done="${!!s.val}" onclick="toggleStep(event,'${p.pedido_id}','${s.campo}',${!!s.val})">
+      <div class="step" data-done="${!!s.val}" ${s.locked ? 'title="O sinal não pode ser alterado por aqui"' : `onclick="toggleStep(event,'${p.pedido_id}','${s.campo}',${!!s.val})"`} style="${s.locked ? 'cursor:not-allowed' : ''}">
         ${s.icon}<span class="step-tooltip">${s.label}</span>
       </div>`).join('');
     const wa = (p.whatsapp_cartao || p.chatid || '').replace('@s.whatsapp.net','');
@@ -602,7 +708,7 @@ async function toggleStep(e, pedidoId, campo, val) {
     renderTable();
   }
   try {
-    const r = await fetch(API+'/pedidos/'+encodeURIComponent(pedidoId), {
+    const r = await apiFetch('/pedidos/'+encodeURIComponent(pedidoId), {
       method:'PATCH', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({campo, valor: !val})
     });
@@ -626,7 +732,7 @@ async function saveOrdem(pedidoId, valor) {
   const num = valor === '' ? null : parseInt(valor);
   if (valor !== '' && isNaN(num)) return;
   try {
-    const r = await fetch(API+'/pedidos/'+encodeURIComponent(pedidoId), {
+    const r = await apiFetch('/pedidos/'+encodeURIComponent(pedidoId), {
       method:'PATCH', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({campo:'ordem', valor: num})
     });
@@ -733,7 +839,7 @@ async function savePedido(pedidoId) {
     link_rastreio: document.getElementById('e-rastreio').value,
   };
   try {
-    const r = await fetch(API+'/pedidos/'+encodeURIComponent(pedidoId), {
+    const r = await apiFetch('/pedidos/'+encodeURIComponent(pedidoId), {
       method:'PATCH', headers:{'Content-Type':'application/json'},
       body: JSON.stringify(updates)
     });
@@ -750,7 +856,7 @@ async function savePedido(pedidoId) {
 async function deletePedido(pedidoId) {
   if (!confirm('Apagar este pedido? Essa ação não pode ser desfeita.')) return;
   try {
-    const r = await fetch(API+'/pedidos/'+encodeURIComponent(pedidoId), { method:'DELETE' });
+    const r = await apiFetch('/pedidos/'+encodeURIComponent(pedidoId), { method:'DELETE' });
     if (!r.ok) throw new Error();
     allPedidos = allPedidos.filter(p => String(p.pedido_id) !== String(pedidoId));
     renderTable(); loadMetricas();
@@ -836,7 +942,7 @@ async function criarPedido() {
     arte_enviada: document.getElementById('e-arte-env').checked,
   };
   try {
-    const r = await fetch(API+'/pedidos', {
+    const r = await apiFetch('/pedidos', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify(body)
     });
