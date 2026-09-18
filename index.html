@@ -134,6 +134,7 @@ select.edit-input option{background:var(--surface2);color:var(--text)}
 .message{max-width:82%;padding:9px 11px;border-radius:10px;font-size:13px;line-height:1.45;white-space:pre-wrap;word-break:break-word;border:1px solid var(--border2)}
 .message.in{align-self:flex-start;background:var(--surface2);border-bottom-left-radius:2px}.message.out{align-self:flex-end;background:rgba(200,240,96,.1);border-color:rgba(200,240,96,.22);border-bottom-right-radius:2px}
 .message-meta{font-family:var(--mono);font-size:9px;color:var(--text3);margin-top:4px}.chat-empty{display:flex;align-items:center;justify-content:center;flex:1;color:var(--text3);padding:30px;text-align:center}
+.message-media{margin-top:8px}.message-media img{display:block;max-width:100%;max-height:360px;border-radius:8px}.message-media audio{width:100%;max-width:320px}.message-media a{color:var(--lime);font-size:12px}
 @media(max-width:760px){.header{padding:14px 16px}.header-right .last-update,.header-right .btn:not(:first-of-type){display:none}.main{padding:18px 14px}.conversation-layout{grid-template-columns:1fr}.conversation-list{max-height:38vh;border-right:0;border-bottom:1px solid var(--border)}.chat-panel{min-height:50vh}.message-list{max-height:45vh}.edit-row{grid-template-columns:1fr}.table-wrap{overflow-x:auto}}
 
 </style>
@@ -535,16 +536,36 @@ async function abrirConversa(index) {
     if (!r.ok) throw new Error();
     const mensagens = await r.json();
     if (!mensagens.length) { body.innerHTML = '<div class="chat-empty">Ainda não há mensagens salvas nesta conversa.</div>'; return; }
-    body.innerHTML = mensagens.map(m => {
+    body.innerHTML = mensagens.map((m, index) => {
       const direcao = String(m.direcao || '').toLowerCase();
       const enviada = direcao.includes('said') || direcao.includes('out');
       const texto = m.texto || '[' + (m.message_type || 'mensagem sem texto') + ']';
       const meta = (enviada ? 'Enviada' : 'Recebida') + ' · ' + fmtDateTime(m.ocorrido_em);
-      return `<div class="message ${enviada ? 'out' : 'in'}">${esc(texto)}<div class="message-meta">${esc(meta)}</div></div>`;
+      const media = m.tem_midia ? `<div class="message-media" id="media-${index}">Carregando mídia...</div>` : '';
+      return `<div class="message ${enviada ? 'out' : 'in'}">${esc(texto)}${media}<div class="message-meta">${esc(meta)}</div></div>`;
     }).join('');
+    mensagens.forEach((m, index) => carregarMidia(conversa, m, index));
     body.scrollTop = body.scrollHeight;
   } catch(e) {
     body.innerHTML = '<div class="chat-empty">Não foi possível carregar as mensagens dessa conversa.</div>';
+  }
+}
+
+async function carregarMidia(conversa, mensagem, index) {
+  if (!mensagem.tem_midia) return;
+  const slot = document.getElementById('media-' + index);
+  if (!slot) return;
+  try {
+    const path = '/conversas/' + encodeURIComponent(conversa.instance_name) + '/' + encodeURIComponent(conversa.chatid) + '/mensagens/' + encodeURIComponent(mensagem.message_id) + '/midia';
+    const r = await apiFetch(path);
+    if (!r.ok) throw new Error();
+    const url = URL.createObjectURL(await r.blob());
+    const type = String(mensagem.media_mime_type || mensagem.message_type || '').toLowerCase();
+    if (type.startsWith('image/') || type.includes('image')) slot.innerHTML = `<img src="${url}" alt="Imagem enviada no WhatsApp">`;
+    else if (type.startsWith('audio/') || type.includes('audio')) slot.innerHTML = `<audio controls src="${url}"></audio>`;
+    else slot.innerHTML = `<a href="${url}" download="${esc(mensagem.media_file_name || 'arquivo')}">Baixar ${esc(mensagem.media_file_name || 'arquivo enviado')}</a>`;
+  } catch {
+    slot.textContent = 'Mídia indisponível no provedor.';
   }
 }
 
@@ -753,10 +774,8 @@ function openModal(pedidoId) {
   document.getElementById('modalTitle').textContent = p.nome_cliente || 'Pedido';
 
   const toggles = [
-    {campo:'sinal_pago',label:'Sinal pago',val:p.sinal_pago},
     {campo:'arte_enviada',label:'Arte enviada',val:p.arte_enviada},
     {campo:'arte_aprovada',label:'Arte aprovada',val:p.arte_aprovada},
-    {campo:'pagamento_final',label:'Pagamento final',val:p.pagamento_final},
     {campo:'postado',label:'Postado',val:p.postado},
   ];
 
@@ -794,9 +813,12 @@ function openModal(pedidoId) {
         </select>
       </div>
     </div>
-    <div class="edit-row">
-      <div class="edit-field"><div class="edit-label">Data do sinal</div><input class="edit-input" id="e-data-sinal" type="date" value="${fmtDateInput(p.data_sinal)}"></div>
-      <div class="edit-field"><div class="edit-label">Código</div><input class="edit-input" value="${p.codigo||''}" disabled></div>
+    <div class="edit-row"><div class="edit-field"><div class="edit-label">Código</div><input class="edit-input" value="${p.codigo||''}" disabled></div></div>
+
+    <div class="modal-section">
+      <div class="modal-section-title">Pagamento</div>
+      <button class="btn btn-primary" onclick="abrirConfirmacaoPix('${p.pedido_id}')">✓ Confirmar Pix manualmente</button>
+      <div style="font-size:11px;color:var(--text3);margin-top:7px">Exige comprovante, quatro conferências e deixa auditoria. Não é um atalho para marcar o sinal.</div>
     </div>
 
     <div class="modal-section">
@@ -835,7 +857,6 @@ async function savePedido(pedidoId) {
     quantidade: document.getElementById('e-qtd').value || null,
     corte: document.getElementById('e-corte').value,
     status: document.getElementById('e-status').value,
-    data_sinal: document.getElementById('e-data-sinal').value || null,
     link_rastreio: document.getElementById('e-rastreio').value,
   };
   try {
@@ -851,6 +872,48 @@ async function savePedido(pedidoId) {
     closeModalDirect();
     showToast('Pedido salvo!','success');
   } catch { showToast('Erro ao salvar','error'); }
+}
+
+async function abrirConfirmacaoPix(pedidoId) {
+  try {
+    const r = await apiFetch('/pagamentos/pix/contexto/' + encodeURIComponent(pedidoId));
+    const ctx = await r.json();
+    if (!r.ok) throw new Error(ctx.error || 'Não foi possível preparar a confirmação');
+    document.getElementById('modalTitle').textContent = 'Confirmar Pix manual';
+    const options = (ctx.comprovantes || []).map(c => `<option value="${esc(c.message_id)}">${esc(fmtDateTime(c.ocorrido_em))} · ${esc(c.message_type || 'mensagem')} · ${esc((c.texto || '').slice(0, 70))}</option>`).join('');
+    document.getElementById('modalBody').innerHTML = `
+      <div class="modal-section"><div class="modal-section-title">Valor calculado pelo pedido</div>
+        <select class="edit-input" id="pix-tipo" onchange="atualizarValorPix()"><option value="sinal">Sinal — ${fmt(ctx.sinal_centavos / 100)}</option><option value="restante">Restante + frete — ${fmt(ctx.restante_centavos / 100)}</option></select>
+        <input type="hidden" id="pix-pedido-id" value="${ctx.pedido_id}">
+      </div>
+      <div class="modal-section"><div class="modal-section-title">Comprovante recebido</div>
+        <select class="edit-input" id="pix-comprovante"><option value="">Selecione a mensagem do comprovante</option>${options}</select>
+      </div>
+      <div class="modal-section"><div class="modal-section-title">Confirme antes de concluir</div>
+        <label><input type="checkbox" id="pix-destino"> O destino/chave Pix é o correto</label><br>
+        <label><input type="checkbox" id="pix-status"> O status é concluído (não pendente/agendado)</label><br>
+        <label><input type="checkbox" id="pix-valor"> O valor confere com o pedido</label><br>
+        <label><input type="checkbox" id="pix-duplicidade"> O comprovante não foi usado antes</label>
+      </div>
+      <div class="modal-section"><div class="modal-section-title">Observação (opcional)</div><input class="edit-input" id="pix-observacao" placeholder="Ex.: conferido no app do banco"></div>
+      <div class="modal-footer"><button class="btn" onclick="closeModalDirect()">Cancelar</button><button class="btn btn-primary" onclick="confirmarPixManual()">Confirmar e registrar</button></div>`;
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function confirmarPixManual() {
+  const comprovante = document.getElementById('pix-comprovante').value;
+  const checks = ['pix-destino','pix-status','pix-valor','pix-duplicidade'];
+  if (!comprovante || checks.some(id => !document.getElementById(id).checked)) { showToast('Selecione o comprovante e marque as quatro conferências.', 'error'); return; }
+  const body = { pedido_id: document.getElementById('pix-pedido-id').value, tipo: document.getElementById('pix-tipo').value,
+    comprovante_message_id: comprovante, destino_conferido: document.getElementById('pix-destino').checked,
+    status_conferido: document.getElementById('pix-status').checked, valor_conferido: document.getElementById('pix-valor').checked,
+    duplicidade_conferida: document.getElementById('pix-duplicidade').checked, observacao: document.getElementById('pix-observacao').value };
+  try {
+    const r = await apiFetch('/pagamentos/pix/confirmar', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+    const result = await r.json();
+    if (!r.ok) throw new Error(result.error || 'Confirmação recusada');
+    await loadAll(); closeModalDirect(); showToast('Pix confirmado e auditado.', 'success');
+  } catch(e) { showToast(e.message, 'error'); }
 }
 
 async function deletePedido(pedidoId) {
@@ -909,9 +972,6 @@ function openNovoPedido() {
     </div>
     <div class="edit-row" style="margin-top:10px">
       <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text2)">
-        <input type="checkbox" id="e-sinal" class="edit-input"> Sinal pago
-      </label>
-      <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text2)">
         <input type="checkbox" id="e-arte-env" class="edit-input"> Arte enviada
       </label>
     </div>
@@ -938,7 +998,6 @@ async function criarPedido() {
     corte: document.getElementById('e-corte').value,
     cep: document.getElementById('e-cep').value,
     status: document.getElementById('e-status').value,
-    sinal_pago: document.getElementById('e-sinal').checked,
     arte_enviada: document.getElementById('e-arte-env').checked,
   };
   try {
