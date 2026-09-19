@@ -554,7 +554,7 @@ async function abrirConversa(index) {
       const texto = m.texto || '[' + (m.message_type || 'mensagem sem texto') + ']';
       const meta = (enviada ? 'Enviada' : 'Recebida') + ' · ' + fmtDateTime(m.ocorrido_em);
       const media = m.tem_midia ? `<div class="message-media" id="media-${index}">Carregando mídia...</div>` : '';
-      const selecionavel = !enviada && !!m.tem_midia && !!m.message_id;
+      const selecionavel = !enviada && !!m.message_id;
       return `<div id="message-${index}" class="message ${enviada ? 'out' : 'in'} ${selecionavel ? 'selectable-receipt' : ''}"${selecionavel ? ` onclick="selecionarComprovante(${index})" title="Selecionar como comprovante do sinal"` : ''}>${esc(texto)}${media}<div class="message-meta">${esc(meta)}${selecionavel ? ' · clique para selecionar' : ''}</div></div>`;
     }).join('');
     mensagens.forEach((m, index) => carregarMidia(conversa, m, index));
@@ -731,7 +731,7 @@ function renderTable() {
 
 function selecionarComprovante(index) {
   const mensagem = mensagensDaConversa[index];
-  if (!mensagem || !conversaSelecionada || !mensagem.tem_midia || !mensagem.message_id) return;
+  if (!mensagem || !conversaSelecionada || !mensagem.message_id) return;
   const direcao = String(mensagem.direcao || '').toLowerCase();
   if (direcao.includes('said') || direcao.includes('out')) return;
   comprovanteSelecionado = { message_id: mensagem.message_id, ocorrido_em: mensagem.ocorrido_em };
