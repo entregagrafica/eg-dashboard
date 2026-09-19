@@ -271,7 +271,7 @@ select.edit-input option{background:var(--surface2);color:var(--text)}
         <div id="conversasBody"><div class="loading">Carregando conversas...</div></div>
       </div>
       <div class="chat-panel">
-        <div class="chat-head"><div class="chat-title" id="chatTitle">Selecione uma conversa</div><div class="chat-subtitle" id="chatSubtitle">O histórico é somente leitura nesta primeira versão.</div></div>
+        <div class="chat-head" style="display:flex;align-items:center;justify-content:space-between;gap:12px"><div><div class="chat-title" id="chatTitle">Selecione uma conversa</div><div class="chat-subtitle" id="chatSubtitle">O histórico é somente leitura nesta primeira versão.</div></div><button class="btn btn-primary" id="chatSinalButton" style="display:none" onclick="confirmarSinalDaConversa(event)">✓ Marcar sinal pago</button></div>
         <div class="message-list" id="mensagensBody"><div class="chat-empty">Escolha uma conversa à esquerda para ver o histórico completo.</div></div>
       </div>
     </div>
@@ -529,6 +529,10 @@ async function abrirConversa(index) {
   renderConversas();
   document.getElementById('chatTitle').textContent = conversa.nome_cliente || conversa.chatid.replace('@s.whatsapp.net','');
   document.getElementById('chatSubtitle').textContent = conversa.chatid + ' · ' + conversa.instance_name;
+  const pedido = allPedidos.find(p => p.instance_name === conversa.instance_name && p.chatid === conversa.chatid);
+  const botaoSinal = document.getElementById('chatSinalButton');
+  botaoSinal.style.display = pedido && !pedido.sinal_pago ? '' : 'none';
+  botaoSinal.dataset.pedidoId = pedido ? String(pedido.pedido_id || pedido.id || '') : '';
   const body = document.getElementById('mensagensBody');
   body.innerHTML = '<div class="chat-empty">Carregando mensagens...</div>';
   try {
@@ -716,10 +720,16 @@ function renderTable() {
     </tr></thead><tbody>${rows}</tbody></table>`;
 }
 
+function confirmarSinalDaConversa(e) {
+  const pedidoId = document.getElementById('chatSinalButton').dataset.pedidoId;
+  if (!pedidoId) return;
+  confirmarSinalManual(e, pedidoId, false);
+}
+
 async function confirmarSinalManual(e, pedidoId, jaPago) {
   e.stopPropagation();
   if (jaPago) return;
-  const idx = allPedidos.findIndex(p => String(p.pedido_id) === String(pedidoId));
+  const idx = allPedidos.findIndex(p => String(p.pedido_id || p.id) === String(pedidoId));
   const before = idx >= 0 ? {...allPedidos[idx]} : null;
   if (idx >= 0) {
     allPedidos[idx] = {...allPedidos[idx], sinal_pago:true, data_sinal: new Date().toISOString()};
@@ -732,6 +742,7 @@ async function confirmarSinalManual(e, pedidoId, jaPago) {
     if (!r.ok) throw new Error();
     const updated = await r.json();
     if (idx >= 0) allPedidos[idx] = updated;
+    document.getElementById('chatSinalButton').style.display = 'none';
     renderTable(); loadMetricas(); showToast('Sinal marcado e registrado.','success');
   } catch {
     if (idx >= 0 && before) { allPedidos[idx] = before; renderTable(); }
