@@ -133,6 +133,7 @@ select.edit-input option{background:var(--surface2);color:var(--text)}
 .message-list{padding:18px;display:flex;flex-direction:column;gap:9px;overflow:auto;max-height:62vh;background:linear-gradient(135deg,rgba(255,255,255,.012),transparent)}
 .message{max-width:82%;padding:9px 11px;border-radius:10px;font-size:13px;line-height:1.45;white-space:pre-wrap;word-break:break-word;border:1px solid var(--border2)}
 .message.in{align-self:flex-start;background:var(--surface2);border-bottom-left-radius:2px}.message.out{align-self:flex-end;background:rgba(200,240,96,.1);border-color:rgba(200,240,96,.22);border-bottom-right-radius:2px}
+.message.selectable-receipt{cursor:pointer}.message.selectable-receipt:hover{border-color:rgba(200,240,96,.55)}.message.selected-receipt{outline:2px solid var(--accent);outline-offset:2px;box-shadow:0 0 0 4px rgba(200,240,96,.12)}
 .message-meta{font-family:var(--mono);font-size:9px;color:var(--text3);margin-top:4px}.chat-empty{display:flex;align-items:center;justify-content:center;flex:1;color:var(--text3);padding:30px;text-align:center}
 .message-media{margin-top:8px}.message-media img{display:block;max-width:100%;max-height:360px;border-radius:8px}.message-media audio{width:100%;max-width:320px}.message-media a{color:var(--lime);font-size:12px}
 @media(max-width:760px){.header{padding:14px 16px}.header-right .last-update,.header-right .btn:not(:first-of-type){display:none}.main{padding:18px 14px}.conversation-layout{grid-template-columns:1fr}.conversation-list{max-height:38vh;border-right:0;border-bottom:1px solid var(--border)}.chat-panel{min-height:50vh}.message-list{max-height:45vh}.edit-row{grid-template-columns:1fr}.table-wrap{overflow-x:auto}}
@@ -328,6 +329,8 @@ let allAtencao = [];
 let allEventos = [];
 let allConversas = [];
 let conversaSelecionada = null;
+let mensagensDaConversa = [];
+let comprovanteSelecionado = null;
 
 // UTILS
 function showToast(msg, type='') {
@@ -526,6 +529,8 @@ async function abrirConversa(index) {
   const conversa = allConversas[index];
   if (!conversa) return;
   conversaSelecionada = conversa;
+  mensagensDaConversa = [];
+  comprovanteSelecionado = null;
   renderConversas();
   document.getElementById('chatTitle').textContent = conversa.nome_cliente || conversa.chatid.replace('@s.whatsapp.net','');
   document.getElementById('chatSubtitle').textContent = conversa.chatid + ' · ' + conversa.instance_name;
@@ -533,12 +538,15 @@ async function abrirConversa(index) {
   const botaoSinal = document.getElementById('chatSinalButton');
   botaoSinal.style.display = pedido?.sinal_pago ? 'none' : '';
   botaoSinal.dataset.pedidoId = String(pedido?.pedido_id || pedido?.id || conversa.chatid || '');
+  botaoSinal.dataset.comprovanteId = '';
+  botaoSinal.textContent = '✓ Marcar sinal pago';
   const body = document.getElementById('mensagensBody');
   body.innerHTML = '<div class="chat-empty">Carregando mensagens...</div>';
   try {
     const r = await apiFetch('/conversas/' + encodeURIComponent(conversa.instance_name) + '/' + encodeURIComponent(conversa.chatid) + '/mensagens?limite=250');
     if (!r.ok) throw new Error();
     const mensagens = await r.json();
+    mensagensDaConversa = mensagens;
     if (!mensagens.length) { body.innerHTML = '<div class="chat-empty">Ainda não há mensagens salvas nesta conversa.</div>'; return; }
     body.innerHTML = mensagens.map((m, index) => {
       const direcao = String(m.direcao || '').toLowerCase();
@@ -546,7 +554,8 @@ async function abrirConversa(index) {
       const texto = m.texto || '[' + (m.message_type || 'mensagem sem texto') + ']';
       const meta = (enviada ? 'Enviada' : 'Recebida') + ' · ' + fmtDateTime(m.ocorrido_em);
       const media = m.tem_midia ? `<div class="message-media" id="media-${index}">Carregando mídia...</div>` : '';
-      return `<div class="message ${enviada ? 'out' : 'in'}">${esc(texto)}${media}<div class="message-meta">${esc(meta)}</div></div>`;
+      const selecionavel = !enviada && !!m.tem_midia && !!m.message_id;
+      return `<div id="message-${index}" class="message ${enviada ? 'out' : 'in'} ${selecionavel ? 'selectable-receipt' : ''}"${selecionavel ? ` onclick="selecionarComprovante(${index})" title="Selecionar como comprovante do sinal"` : ''}>${esc(texto)}${media}<div class="message-meta">${esc(meta)}${selecionavel ? ' · clique para selecionar' : ''}</div></div>`;
     }).join('');
     mensagens.forEach((m, index) => carregarMidia(conversa, m, index));
     body.scrollTop = body.scrollHeight;
@@ -720,24 +729,49 @@ function renderTable() {
     </tr></thead><tbody>${rows}</tbody></table>`;
 }
 
-function confirmarSinalDaConversa(e) {
-  const pedidoId = document.getElementById('chatSinalButton').dataset.pedidoId;
-  if (!pedidoId) return;
-  confirmarSinalManual(e, pedidoId, false);
+function selecionarComprovante(index) {
+  const mensagem = mensagensDaConversa[index];
+  if (!mensagem || !conversaSelecionada || !mensagem.tem_midia || !mensagem.message_id) return;
+  const direcao = String(mensagem.direcao || '').toLowerCase();
+  if (direcao.includes('said') || direcao.includes('out')) return;
+  comprovanteSelecionado = { message_id: mensagem.message_id, ocorrido_em: mensagem.ocorrido_em };
+  document.querySelectorAll('.message.selectable-receipt').forEach(el => el.classList.remove('selected-receipt'));
+  document.getElementById('message-' + index)?.classList.add('selected-receipt');
+  const botao = document.getElementById('chatSinalButton');
+  botao.dataset.comprovanteId = mensagem.message_id;
+  botao.textContent = '✓ Marcar sinal pago em ' + fmtDate(mensagem.ocorrido_em);
+  showToast('Comprovante selecionado. A data do sinal será ' + fmtDate(mensagem.ocorrido_em) + '.', 'success');
 }
 
-async function confirmarSinalManual(e, pedidoId, jaPago) {
+function confirmarSinalDaConversa(e) {
+  const botao = document.getElementById('chatSinalButton');
+  const pedidoId = botao.dataset.pedidoId;
+  if (!pedidoId) return;
+  const comprovanteId = botao.dataset.comprovanteId;
+  if (!comprovanteId) {
+    showToast('Selecione a imagem, áudio ou documento do comprovante primeiro.', 'error');
+    return;
+  }
+  confirmarSinalManual(e, pedidoId, false, comprovanteId);
+}
+
+async function confirmarSinalManual(e, pedidoId, jaPago, comprovanteMessageId = '') {
   e.stopPropagation();
   if (jaPago) return;
   const idx = allPedidos.findIndex(p => String(p.pedido_id || p.id) === String(pedidoId));
   const before = idx >= 0 ? {...allPedidos[idx]} : null;
   if (idx >= 0) {
-    allPedidos[idx] = {...allPedidos[idx], sinal_pago:true, data_sinal: new Date().toISOString()};
+    allPedidos[idx] = {...allPedidos[idx], sinal_pago:true, data_sinal: (comprovanteMessageId ? comprovanteSelecionado?.ocorrido_em : '') || new Date().toISOString()};
     renderTable();
   }
   try {
     const r = await apiFetch('/pedidos/' + encodeURIComponent(pedidoId) + '/confirmar-sinal-manual', {
-      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({observacao:'Atalho operacional do painel'})
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({
+        observacao: comprovanteMessageId ? 'Comprovante selecionado no chat' : 'Atalho operacional do painel',
+        comprovante_message_id: comprovanteMessageId || undefined,
+        instance_name: comprovanteMessageId ? conversaSelecionada?.instance_name : undefined,
+        chatid: comprovanteMessageId ? conversaSelecionada?.chatid : undefined
+      })
     });
     if (!r.ok) throw new Error();
     const updated = await r.json();
