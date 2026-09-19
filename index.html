@@ -339,7 +339,11 @@ function showToast(msg, type='') {
   setTimeout(() => t.className = 'toast', 2500);
 }
 function fmt(v) { return v ? 'R$ ' + Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2}) : '—'; }
-function fmtDate(v) { return v ? new Date(v).toLocaleDateString('pt-BR') : '—'; }
+function fmtDate(v) {
+  if (!v) return '—';
+  const iso = String(v).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return iso ? `${iso[3]}/${iso[2]}/${iso[1]}` : new Date(v).toLocaleDateString('pt-BR');
+}
 function fmtDateInput(v) {
   if (!v) return '';
   const d = new Date(v);
