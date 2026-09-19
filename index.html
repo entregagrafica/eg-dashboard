@@ -770,17 +770,18 @@ async function confirmarSinalManual(e, pedidoId, jaPago, comprovanteMessageId = 
         observacao: comprovanteMessageId ? 'Comprovante selecionado no chat' : 'Atalho operacional do painel',
         comprovante_message_id: comprovanteMessageId || undefined,
         instance_name: comprovanteMessageId ? conversaSelecionada?.instance_name : undefined,
-        chatid: comprovanteMessageId ? conversaSelecionada?.chatid : undefined
+        chatid: comprovanteMessageId ? conversaSelecionada?.chatid : undefined,
+        nome_cliente: comprovanteMessageId ? conversaSelecionada?.nome_cliente : undefined
       })
     });
-    if (!r.ok) throw new Error();
     const updated = await r.json();
+    if (!r.ok) throw new Error(updated.error || 'Não foi possível registrar o sinal');
     if (idx >= 0) allPedidos[idx] = updated;
     document.getElementById('chatSinalButton').style.display = 'none';
     renderTable(); loadMetricas(); showToast('Sinal marcado e registrado.','success');
-  } catch {
+  } catch (erro) {
     if (idx >= 0 && before) { allPedidos[idx] = before; renderTable(); }
-    showToast('Erro ao marcar o sinal','error');
+    showToast(erro.message || 'Erro ao marcar o sinal','error');
   }
 }
 
