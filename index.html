@@ -531,8 +531,8 @@ async function abrirConversa(index) {
   document.getElementById('chatSubtitle').textContent = conversa.chatid + ' · ' + conversa.instance_name;
   const pedido = allPedidos.find(p => p.instance_name === conversa.instance_name && p.chatid === conversa.chatid);
   const botaoSinal = document.getElementById('chatSinalButton');
-  botaoSinal.style.display = pedido && !pedido.sinal_pago ? '' : 'none';
-  botaoSinal.dataset.pedidoId = pedido ? String(pedido.pedido_id || pedido.id || '') : '';
+  botaoSinal.style.display = pedido?.sinal_pago ? 'none' : '';
+  botaoSinal.dataset.pedidoId = String(pedido?.pedido_id || pedido?.id || conversa.chatid || '');
   const body = document.getElementById('mensagensBody');
   body.innerHTML = '<div class="chat-empty">Carregando mensagens...</div>';
   try {
