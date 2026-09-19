@@ -681,14 +681,14 @@ function renderTable() {
   const rows = pedidos.map((p, index) => {
     const num = index + 1;
     const steps = [
-      {campo:'sinal_pago',icon:'$',label:'Sinal (somente confirmação auditável)',val:p.sinal_pago,locked:true},
+      {campo:'sinal_pago',icon:'$',label:'Sinal',val:p.sinal_pago,manual:true},
       {campo:'arte_enviada',icon:'✎',label:'Arte',val:p.arte_enviada},
       {campo:'arte_aprovada',icon:'✓',label:'Aprovada',val:p.arte_aprovada},
       {campo:'pagamento_final',icon:'₿',label:'Pgto Final',val:p.pagamento_final},
       {campo:'postado',icon:'▲',label:'Postado',val:p.postado},
     ];
     const stepsHtml = steps.map(s => `
-      <div class="step" data-done="${!!s.val}" ${s.locked ? 'title="O sinal não pode ser alterado por aqui"' : `onclick="toggleStep(event,'${p.pedido_id}','${s.campo}',${!!s.val})"`} style="${s.locked ? 'cursor:not-allowed' : ''}">
+      <div class="step" data-done="${!!s.val}" ${s.manual ? `onclick="confirmarSinalManual(event,'${p.pedido_id}',${!!s.val})"` : `onclick="toggleStep(event,'${p.pedido_id}','${s.campo}',${!!s.val})"`}>
         ${s.icon}<span class="step-tooltip">${s.label}</span>
       </div>`).join('');
     const wa = (p.whatsapp_cartao || p.chatid || '').replace('@s.whatsapp.net','');
@@ -714,6 +714,29 @@ function renderTable() {
       <th style="width:52px;text-align:center" title="Ordem manual">Ord.</th>
       <th>Cliente</th><th>WhatsApp</th><th>Valor</th><th>Etapas</th><th>Atualizado</th>
     </tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+async function confirmarSinalManual(e, pedidoId, jaPago) {
+  e.stopPropagation();
+  if (jaPago) return;
+  const idx = allPedidos.findIndex(p => String(p.pedido_id) === String(pedidoId));
+  const before = idx >= 0 ? {...allPedidos[idx]} : null;
+  if (idx >= 0) {
+    allPedidos[idx] = {...allPedidos[idx], sinal_pago:true, data_sinal: new Date().toISOString()};
+    renderTable();
+  }
+  try {
+    const r = await apiFetch('/pedidos/' + encodeURIComponent(pedidoId) + '/confirmar-sinal-manual', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({observacao:'Atalho operacional do painel'})
+    });
+    if (!r.ok) throw new Error();
+    const updated = await r.json();
+    if (idx >= 0) allPedidos[idx] = updated;
+    renderTable(); loadMetricas(); showToast('Sinal marcado e registrado.','success');
+  } catch {
+    if (idx >= 0 && before) { allPedidos[idx] = before; renderTable(); }
+    showToast('Erro ao marcar o sinal','error');
+  }
 }
 
 // TOGGLE RÁPIDO
@@ -817,8 +840,8 @@ function openModal(pedidoId) {
 
     <div class="modal-section">
       <div class="modal-section-title">Pagamento</div>
-      <button class="btn btn-primary" onclick="abrirConfirmacaoPix('${p.pedido_id}')">✓ Confirmar Pix manualmente</button>
-      <div style="font-size:11px;color:var(--text3);margin-top:7px">Exige comprovante, quatro conferências e deixa auditoria. Não é um atalho para marcar o sinal.</div>
+      <button class="btn btn-primary" onclick="confirmarSinalManual(event,'${p.pedido_id}',${!!p.sinal_pago})">✓ Marcar sinal pago</button>
+      <div style="font-size:11px;color:var(--text3);margin-top:7px">Atalho de contingência: registra a origem manual no histórico do pedido.</div>
     </div>
 
     <div class="modal-section">
