@@ -346,6 +346,8 @@ function fmtDate(v) {
 }
 function fmtDateInput(v) {
   if (!v) return '';
+  const iso = String(v).match(/^(\d{4}-\d{2}-\d{2})/);
+  if (iso) return iso[1];
   const d = new Date(v);
   return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
 }
@@ -705,7 +707,7 @@ function renderTable() {
       {campo:'postado',icon:'▲',label:'Postado',val:p.postado},
     ];
     const stepsHtml = steps.map(s => `
-      <div class="step" data-done="${!!s.val}" ${s.manual ? `onclick="confirmarSinalManual(event,'${p.pedido_id}',${!!s.val})"` : `onclick="toggleStep(event,'${p.pedido_id}','${s.campo}',${!!s.val})"`}>
+      <div class="step" data-done="${!!s.val}" ${s.manual ? `onclick="alternarSinalManual(event,'${p.pedido_id}',${!!s.val})"` : `onclick="toggleStep(event,'${p.pedido_id}','${s.campo}',${!!s.val})"`}>
         ${s.icon}<span class="step-tooltip">${s.label}</span>
       </div>`).join('');
     const wa = (p.whatsapp_cartao || p.chatid || '').replace('@s.whatsapp.net','');
@@ -759,6 +761,33 @@ function confirmarSinalDaConversa(e) {
   confirmarSinalManual(e, pedidoId, false, comprovanteId);
 }
 
+async function alternarSinalManual(e, pedidoId, jaPago) {
+  if (!jaPago) return confirmarSinalManual(e, pedidoId, false);
+  e.stopPropagation();
+  if (!confirm('Desmarcar o sinal pago deste pedido? A data do sinal também será removida.')) return;
+  const idx = allPedidos.findIndex(p => String(p.pedido_id || p.id) === String(pedidoId));
+  const before = idx >= 0 ? {...allPedidos[idx]} : null;
+  if (idx >= 0) {
+    allPedidos[idx] = {...allPedidos[idx], sinal_pago:false, data_sinal:null};
+    renderTable();
+  }
+  try {
+    const r = await apiFetch('/pedidos/' + encodeURIComponent(pedidoId) + '/desmarcar-sinal-manual', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ observacao:'Sinal desmarcado manualmente pelo painel' })
+    });
+    const updated = await r.json();
+    if (!r.ok) throw new Error(updated.error || 'Não foi possível desmarcar o sinal');
+    if (idx >= 0) allPedidos[idx] = updated;
+    renderTable(); loadMetricas();
+    if (document.getElementById('modalBg').classList.contains('open')) openModal(pedidoId);
+    showToast('Sinal desmarcado.','success');
+  } catch (erro) {
+    if (idx >= 0 && before) { allPedidos[idx] = before; renderTable(); }
+    showToast(erro.message || 'Erro ao desmarcar o sinal','error');
+  }
+}
+
 async function confirmarSinalManual(e, pedidoId, jaPago, comprovanteMessageId = '') {
   e.stopPropagation();
   if (jaPago) return;
@@ -782,7 +811,9 @@ async function confirmarSinalManual(e, pedidoId, jaPago, comprovanteMessageId = 
     if (!r.ok) throw new Error(updated.error || 'Não foi possível registrar o sinal');
     if (idx >= 0) allPedidos[idx] = updated;
     document.getElementById('chatSinalButton').style.display = 'none';
-    renderTable(); loadMetricas(); showToast('Sinal marcado e registrado.','success');
+    renderTable(); loadMetricas();
+    if (document.getElementById('modalBg').classList.contains('open')) openModal(pedidoId);
+    showToast('Sinal marcado e registrado.','success');
   } catch (erro) {
     if (idx >= 0 && before) { allPedidos[idx] = before; renderTable(); }
     showToast(erro.message || 'Erro ao marcar o sinal','error');
@@ -887,10 +918,11 @@ function openModal(pedidoId) {
       </div>
     </div>
     <div class="edit-row"><div class="edit-field"><div class="edit-label">Código</div><input class="edit-input" value="${p.codigo||''}" disabled></div></div>
+    <div class="edit-row"><div class="edit-field"><div class="edit-label">Data do sinal</div><input class="edit-input" id="e-data-sinal" type="date" value="${fmtDateInput(p.data_sinal)}"></div></div>
 
     <div class="modal-section">
       <div class="modal-section-title">Pagamento</div>
-      <button class="btn btn-primary" onclick="confirmarSinalManual(event,'${p.pedido_id}',${!!p.sinal_pago})">✓ Marcar sinal pago</button>
+      <button class="btn ${p.sinal_pago ? 'btn-danger' : 'btn-primary'}" onclick="alternarSinalManual(event,'${p.pedido_id}',${!!p.sinal_pago})">${p.sinal_pago ? '↶ Desmarcar sinal pago' : '✓ Marcar sinal pago'}</button>
       <div style="font-size:11px;color:var(--text3);margin-top:7px">Atalho de contingência: registra a origem manual no histórico do pedido.</div>
     </div>
 
@@ -930,6 +962,7 @@ async function savePedido(pedidoId) {
     quantidade: document.getElementById('e-qtd').value || null,
     corte: document.getElementById('e-corte').value,
     status: document.getElementById('e-status').value,
+    data_sinal: document.getElementById('e-data-sinal').value || null,
     link_rastreio: document.getElementById('e-rastreio').value,
   };
   try {
